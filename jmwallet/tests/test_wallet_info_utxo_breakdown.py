@@ -343,9 +343,9 @@ def test_show_utxos_flag_end_to_end(categorized_wallet):
 def test_categorized_utxos_ansi_via_isatty(categorized_wallet, capsys):
     """Patching ``isatty()`` to True enables ANSI codes in the breakdown.
 
-    The TTY guard in ``_color_enabled`` is what switches colors on: section
-    titles render bold cyan and the mixdepth labels render cyan, each wrapped
-    in the matching reset sequence.
+    The TTY guard in ``jmwallet.cli.ansi.color_enabled`` is what switches
+    colors on: section titles render bold cyan and the mixdepth labels render
+    cyan, each wrapped in the matching reset sequence.
     """
     from jmwallet.cli import wallet as wallet_cli
 
@@ -362,8 +362,6 @@ def test_categorized_utxos_ansi_via_isatty(categorized_wallet, capsys):
 
 def test_show_utxos_headers_colored_on_tty(categorized_wallet):
     """On a TTY the info command colors the yellow header and cyan MD labels."""
-    from jmwallet.cli import wallet as wallet_cli
-
     mock_wallet, _ = categorized_wallet
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -373,7 +371,7 @@ def test_show_utxos_headers_colored_on_tty(categorized_wallet):
         with patch("jmwallet.wallet.service.WalletService", return_value=mock_wallet):
             # Force the TTY code path regardless of the CliRunner's captured
             # (non-tty) stdout, which swaps ``sys.stdout`` during invoke.
-            with patch.object(wallet_cli, "_color_enabled", return_value=True):
+            with patch("jmwallet.cli.ansi.color_enabled", return_value=True):
                 result = runner.invoke(
                     app,
                     [

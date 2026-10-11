@@ -350,6 +350,7 @@ class TestSettingsDefaults:
         assert settings.wallet.mixdepth_count == 5
         assert settings.wallet.gap_limit == 20
         assert settings.wallet.dust_threshold == 27300
+        assert settings.wallet.info_show_fidelity_bonds is True
 
     def test_nick_change_notifications_are_disabled_by_default(self) -> None:
         settings = JoinMarketSettings()

@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,6 +25,13 @@ from jmcore.paths import get_default_data_dir
 from loguru import logger
 
 from jmwallet.cli import app
+from jmwallet.cli.ansi import (
+    ANSI_BOLD_CYAN,
+    ANSI_BOLD_WHITE,
+    ANSI_BOLD_YELLOW,
+    ANSI_CYAN,
+    colorize,
+)
 from jmwallet.cli.mnemonic import (
     generate_mnemonic_secure,
     interactive_mnemonic_input,
@@ -36,39 +44,8 @@ from jmwallet.cli.mnemonic import (
 if TYPE_CHECKING:
     from jmcore.settings import JoinMarketSettings
 
+    from jmwallet.wallet.models import AddressInfo
     from jmwallet.wallet.service import WalletService
-
-
-# ANSI SGR codes used by the extended wallet-info view. Kept as named
-# constants so the call sites stay readable and the escape sequences are not
-# scattered as raw literals.
-_ANSI_RESET = "\033[0m"
-_ANSI_BOLD_YELLOW = "\033[1;33m"
-_ANSI_BOLD_WHITE = "\033[1;37m"
-_ANSI_BOLD_CYAN = "\033[1;36m"
-_ANSI_CYAN = "\033[0;36m"
-
-
-def _color_enabled() -> bool:
-    """Whether ANSI colors should be emitted to stdout.
-
-    Colors are only safe on an interactive terminal. When stdout is piped or
-    redirected (``jm-wallet info --extended > file`` / ``| less`` / CI logs),
-    raw escape codes corrupt the output and break downstream parsing, so they
-    are suppressed. The ``NO_COLOR`` convention (https://no-color.org) is also
-    honored. This mirrors the TTY guards already used elsewhere in the CLI
-    (e.g. the freeze manager and the interactive UTXO selector).
-    """
-    if os.environ.get("NO_COLOR") is not None:
-        return False
-    return sys.stdout.isatty()
-
-
-def _colorize(text: str, code: str) -> str:
-    """Wrap ``text`` in an ANSI ``code`` when colors are enabled, else return it unchanged."""
-    if not _color_enabled():
-        return text
-    return f"{code}{text}{_ANSI_RESET}"
 
 
 @app.command("delete")
@@ -792,6 +769,7 @@ def generate(
 
 @app.command()
 def info(
+    ctx: typer.Context,
     mnemonic_file: Annotated[
         Path | None,
         typer.Option("--mnemonic-file", "-f", help="Path to mnemonic file", envvar="MNEMONIC_FILE"),
@@ -820,6 +798,18 @@ def info(
             help="Show detailed addresses, derivations, and UTXO outpoints",
         ),
     ] = False,
+    view: Annotated[
+        str,
+        typer.Option(
+            "--view",
+            help=(
+                "Extended-view layout: 'legacy' (the existing layout, default) "
+                "or 'full' (pipe-aligned table, one line per UTXO, exact "
+                "confirmation counts, explicit spendable state). "
+                "Requires --extended."
+            ),
+        ),
+    ] = "legacy",
     gap: Annotated[
         int, typer.Option("--gap", "-g", help="Max address gap to show in extended view")
     ] = 6,
@@ -880,6 +870,17 @@ def info(
     ] = None,
 ) -> None:
     """Display wallet information and balances by mixdepth."""
+    # Fail fast on invalid flag combinations, before any mnemonic prompt or
+    # backend connection: --view only selects the *extended* layout, so it is
+    # meaningless (and likely a user mistake) without --extended.
+    if view not in ("legacy", "full"):
+        typer.echo(f"Error: Invalid --view '{view}'. Choose from: legacy, full.", err=True)
+        raise typer.Exit(2)
+    view_source = ctx.get_parameter_source("view")
+    if view_source is not None and view_source.name == "COMMANDLINE" and not extended:
+        typer.echo("Error: --view requires --extended.", err=True)
+        raise typer.Exit(2)
+
     settings = setup_cli(log_level, data_dir=data_dir, config_file=config_file)
 
     try:
@@ -912,6 +913,7 @@ def info(
             backend,
             resolved_bip39_passphrase,
             extended=extended,
+            view=view,
             display_gap=gap,
             gap_limit=settings.wallet.gap_limit,
             scan_range=settings.wallet.scan_range,
@@ -920,6 +922,7 @@ def info(
             reconstruct_history=settings.wallet.reconstruct_history,
             show_empty=show_empty,
             show_utxos=show_utxos,
+            show_fidelity_bonds=settings.wallet.info_show_fidelity_bonds,
             creation_height=resolved.creation_height if resolved else None,
             mnemonic_file=resolved.mnemonic_file if resolved else None,
             scan_status_only=scan_status,
@@ -932,6 +935,7 @@ async def _show_wallet_info(
     backend_settings: ResolvedBackendSettings,
     bip39_passphrase: str = "",
     extended: bool = False,
+    view: str = "legacy",
     display_gap: int = 6,
     gap_limit: int = 20,
     scan_range: int = 1000,
@@ -940,6 +944,7 @@ async def _show_wallet_info(
     reconstruct_history: bool = True,
     show_empty: bool = False,
     show_utxos: bool = False,
+    show_fidelity_bonds: bool = True,
     creation_height: int | None = None,
     mnemonic_file: Path | None = None,
     scan_status_only: bool = False,
@@ -1117,14 +1122,13 @@ async def _show_wallet_info(
         # Show the wallet name and master fingerprint so users can pass the
         # fingerprint via --wallet-fingerprint to cold-wallet bond commands.
         if wallet.mnemonic_file is not None:
-            print(f"\n{_colorize('Wallet:', _ANSI_BOLD_YELLOW)} {wallet.mnemonic_file.name}")
+            print(f"\n{colorize('Wallet:', ANSI_BOLD_YELLOW)} {wallet.mnemonic_file.name}")
             print(
-                f"{_colorize('Wallet fingerprint:', _ANSI_BOLD_YELLOW)} {wallet.wallet_fingerprint}"
+                f"{colorize('Wallet fingerprint:', ANSI_BOLD_YELLOW)} {wallet.wallet_fingerprint}"
             )
         else:
             print(
-                f"\n{_colorize('Wallet fingerprint:', _ANSI_BOLD_YELLOW)} "
-                f"{wallet.wallet_fingerprint}"
+                f"\n{colorize('Wallet fingerprint:', ANSI_BOLD_YELLOW)} {wallet.wallet_fingerprint}"
             )
 
         # Spendable balance: get_total_balance() excludes frozen UTXOs (and,
@@ -1166,22 +1170,35 @@ async def _show_wallet_info(
         )
 
         if extended:
-            # Extended view with detailed address information
-            _show_extended_wallet_info(
-                wallet,
-                used_addresses,
-                history_addresses,
-                display_gap,
-                show_empty=show_empty,
-                balance_width=balance_width,
-            )
+            # Extended view with detailed address information. ``legacy``
+            # keeps the existing layout; ``full`` renders the
+            # canonical row model as pipe-aligned tables.
+            if view == "full":
+                _show_full_wallet_info(
+                    wallet,
+                    used_addresses,
+                    history_addresses,
+                    display_gap,
+                    show_empty=show_empty,
+                    show_fidelity_bonds=show_fidelity_bonds,
+                )
+            else:
+                _show_extended_wallet_info(
+                    wallet,
+                    used_addresses,
+                    history_addresses,
+                    display_gap,
+                    show_empty=show_empty,
+                    balance_width=balance_width,
+                    show_fidelity_bonds=show_fidelity_bonds,
+                )
         else:
             # Balance checks must not allocate receive addresses.
             # Simple view - show UTXO breakdown, then balance per mixdepth
             if show_utxos:
                 _print_categorized_utxos(wallet)
 
-            print(f"\n{_colorize('Spendable Balance by Mixdepth:', _ANSI_BOLD_YELLOW)}")
+            print(f"\n{colorize('Spendable Balance by Mixdepth:', ANSI_BOLD_YELLOW)}")
             md_balances = [
                 await wallet.get_balance(md, include_fidelity_bonds=False)
                 for md in range(wallet.mixdepth_count)
@@ -1264,7 +1281,7 @@ async def _show_wallet_info(
                 printed_labels.append("- Fidelity Bonds Time-Locked:")
         balance_label_width = max(len(label) for label in printed_labels)
 
-        header = _colorize(f"{'Total Wallet Balance:':<{balance_label_width}}", _ANSI_BOLD_YELLOW)
+        header = colorize(f"{'Total Wallet Balance:':<{balance_label_width}}", ANSI_BOLD_YELLOW)
         print(f"\n{header}{total_balance:>{block_width},}{unit_suffix}")
 
         # Subtract frozen UTXOs (not spendable)
@@ -1446,7 +1463,7 @@ def _print_categorized_utxos(wallet: WalletService) -> None:
     ]
 
     for title, items in sections:
-        print(f"\n{_colorize(title, _ANSI_BOLD_CYAN)}")
+        print(f"\n{colorize(title, ANSI_BOLD_CYAN)}")
         if not items:
             print("  none")
             continue
@@ -1468,7 +1485,7 @@ def _print_categorized_utxos(wallet: WalletService) -> None:
                 state = "redeemable"
             else:
                 state = "spendable"
-            md_label = _colorize(f"MD {md}:".ljust(md_width), _ANSI_CYAN)
+            md_label = colorize(f"MD {md}:".ljust(md_width), ANSI_CYAN)
             print(
                 f"  {md_label} {addr_field:<{addr_width}} | "
                 f"{utxo.value:>{value_width},} sats | "
@@ -1558,6 +1575,46 @@ def _print_branch_addresses(
     return total_balance, hidden
 
 
+def _fidelity_bond_hidden_notice(bond_addresses: list[AddressInfo], coin_type: int) -> str | None:
+    """One-line notice standing in for the hidden fidelity bond table.
+
+    Shown when ``wallet.info_show_fidelity_bonds`` is false so the user
+    knows the wallet holds bonds and where to re-enable the table. Only
+    funded bonds (balance > 0) count — an unfunded or fully redeemed
+    bond address hides nothing, so ``None`` is returned and no notice
+    appears at all. Funded bonds are split into active (locktime still
+    running) and expired (redeemable); the total value is included so
+    the page's balances stay reconcilable even though the branch and
+    mixdepth totals exclude the hidden bonds.
+    """
+    from jmwallet.wallet.constants import FIDELITY_BOND_BRANCH
+
+    now = int(time.time())
+    active = sum(
+        1 for a in bond_addresses if a.balance > 0 and a.locktime is not None and a.locktime > now
+    )
+    expired = sum(
+        1 for a in bond_addresses if a.balance > 0 and (a.locktime is None or a.locktime <= now)
+    )
+    if active + expired == 0:
+        return None
+    counts = ", ".join(
+        part
+        for part in (
+            f"{active} active" if active else "",
+            f"{expired} expired" if expired else "",
+        )
+        if part
+    )
+    total = sum(a.balance for a in bond_addresses)
+    bond_path = f"m/84'/{coin_type}'/0'/{FIDELITY_BOND_BRANCH}"
+    return (
+        f"{colorize('fidelity bond addr.', ANSI_CYAN)}  {bond_path}  hidden "
+        f"({counts}, {total:,} sats) - "
+        "set wallet.info_show_fidelity_bonds = true in config.toml to show"
+    )
+
+
 def _show_extended_wallet_info(
     wallet: WalletService,
     used_addresses: set[str],
@@ -1565,6 +1622,7 @@ def _show_extended_wallet_info(
     gap_limit: int,
     show_empty: bool = False,
     balance_width: int = 10,
+    show_fidelity_bonds: bool = True,
 ) -> None:
     """
     Display extended wallet information with detailed address listings.
@@ -1580,13 +1638,18 @@ def _show_extended_wallet_info(
     first unused "new" address of each branch is still displayed so the
     user has a fresh receive address at a glance, and the number of
     hidden entries is printed as a summary line.
+
+    ``show_fidelity_bonds=False`` (``wallet.info_show_fidelity_bonds``)
+    drops the fidelity bond block of mixdepth 0. The bond addresses are
+    still fetched so a one-line notice can point at funded hidden bonds
+    instead of hiding them silently.
     """
 
     from jmwallet.history import get_pending_transactions
     from jmwallet.wallet.service import FIDELITY_BOND_BRANCH
 
     # Print legend for address statuses
-    print(f"\n{_colorize('Address status legend:', _ANSI_BOLD_WHITE)}")
+    print(f"\n{colorize('Address status legend:', ANSI_BOLD_WHITE)}")
     print("  new           - Unused, safe for receiving")
     print("  deposit       - Address with funds from internal or external sources")
     print("  cj-out        - CoinJoin output (mixed funds)")
@@ -1616,7 +1679,7 @@ def _show_extended_wallet_info(
 
         print()  # Visual separator before mixdepth output
 
-        print(f"{_colorize(f'Mixdepth {md}', _ANSI_BOLD_CYAN)}\t{zpub}")
+        print(f"{colorize(f'Mixdepth {md}', ANSI_BOLD_CYAN)}\t{zpub}")
 
         # External addresses (receive / deposit)
         ext_addresses = wallet.get_address_info_for_mixdepth(
@@ -1624,7 +1687,7 @@ def _show_extended_wallet_info(
         )
         # Get the external branch zpub path
         ext_path = f"m/84'/{0 if wallet.network == 'mainnet' else 1}'/{md}'/0"
-        print(f"{_colorize('external addresses', _ANSI_CYAN)}\t{ext_path}\t{zpub}")
+        print(f"{colorize('external addresses', ANSI_CYAN)}\t{ext_path}\t{zpub}")
 
         ext_balance = 0
         ext_balance, ext_hidden = _print_branch_addresses(
@@ -1655,7 +1718,7 @@ def _show_extended_wallet_info(
             md, 1, gap_limit, used_addresses, history_addresses
         )
         int_path = f"m/84'/{0 if wallet.network == 'mainnet' else 1}'/{md}'/1"
-        print(f"{_colorize('internal addresses', _ANSI_CYAN)}\t{int_path}")
+        print(f"{colorize('internal addresses', ANSI_CYAN)}\t{int_path}")
 
         int_balance, int_hidden = _print_branch_addresses(
             int_addresses,
@@ -1680,20 +1743,24 @@ def _show_extended_wallet_info(
             )
         print(f"Balance: {int_balance:,} sats (spendable: {int_balance - int_frozen:,} sats)")
 
-        # Fidelity bond branch (only for mixdepth 0)
+        # Fidelity bond addresses (only for mixdepth 0). Fetched even when
+        # the branch is hidden (wallet.info_show_fidelity_bonds=false) so a
+        # one-line notice can point at funded bonds instead of hiding them
+        # silently.
         bond_addresses: list = []  # Initialize for type checker
         if md == 0:
             bond_addresses = wallet.get_fidelity_bond_addresses_info(gap_limit)
+
+        # Fidelity bond branch (only for mixdepth 0)
+        if md == 0 and show_fidelity_bonds:
             if bond_addresses:
                 bond_path = (
                     f"m/84'/{0 if wallet.network == 'mainnet' else 1}'/0'/{FIDELITY_BOND_BRANCH}"
                 )
-                print(f"{_colorize('fidelity bond addresses', _ANSI_CYAN)}\t{bond_path}\t{zpub}")
+                print(f"{colorize('fidelity bond addresses', ANSI_CYAN)}\t{bond_path}\t{zpub}")
 
                 bond_balance = 0
                 bond_locked = 0  # Locked balance (not yet expired)
-                import time
-
                 current_time = int(time.time())
 
                 for addr_info in bond_addresses:
@@ -1725,32 +1792,285 @@ def _show_extended_wallet_info(
                     print(
                         f"Balance: {bond_balance:,} sats "
                         f"({bond_locked:,} time-locked + {expired_balance:,} expired) "
-                        f"(spendable: 0 sats)"
+                        f"(redeemable: {expired_balance:,} sats)"
                     )
                 elif bond_locked > 0:
                     print(
                         f"Balance: {bond_balance:,} sats "
                         f"({bond_locked:,} time-locked) "
-                        f"(spendable: 0 sats)"
+                        f"(redeemable: 0 sats)"
                     )
                 else:
                     print(
                         f"Balance: {bond_balance:,} sats "
                         f"({expired_balance:,} expired) "
-                        f"(spendable: 0 sats)"
+                        f"(redeemable: {expired_balance:,} sats)"
                     )
+
+        # With the branch hidden, a one-line notice stands in its place so
+        # funded bonds do not vanish silently (and the reduced totals below
+        # can be reconciled via the notice's sats sum).
+        if md == 0 and not show_fidelity_bonds:
+            notice = _fidelity_bond_hidden_notice(
+                bond_addresses, 0 if wallet.network == "mainnet" else 1
+            )
+            if notice is not None:
+                print()
+                print(notice)
 
         # Total balance for mixdepth with spendable calculation
         total_md_balance = ext_balance + int_balance
         spendable_md = (ext_balance - ext_frozen) + (int_balance - int_frozen)
 
-        # For mixdepth 0, add FB balance to total (FBs are not spendable)
-        if md == 0 and bond_addresses:
+        # For mixdepth 0, add FB balance to total (FBs are not spendable) —
+        # only when the branch is actually shown, so the displayed branch
+        # balances keep adding up to the mixdepth total when bonds are hidden.
+        if md == 0 and show_fidelity_bonds and bond_addresses:
             total_md_balance += sum(addr_info.balance for addr_info in bond_addresses)
 
-        md_label = _colorize(f"Balance for mixdepth {md}:", _ANSI_CYAN)
+        md_label = colorize(f"Balance for mixdepth {md}:", ANSI_CYAN)
         print(f"{md_label}\t{total_md_balance:,} sats (spendable: {spendable_md:,} sats)")
         print("-" * 89)
+
+
+def _show_full_wallet_info(
+    wallet: WalletService,
+    used_addresses: set[str],
+    history_addresses: dict[str, str],
+    gap_limit: int,
+    show_empty: bool = False,
+    show_fidelity_bonds: bool = True,
+) -> None:
+    """Render the ``full`` extended view via the canonical row model.
+
+    Uses the same data sources as the legacy extended view
+    (:func:`_show_extended_wallet_info`), but all layout is delegated to the
+    row model (:mod:`jmwallet.wallet.rows`) and the pipe-aligned renderer
+    (:mod:`jmwallet.cli.info_render`): one line per UTXO, exact confirmation
+    counts, explicit ``spendable`` state, and the display-level
+    ``reg-change`` label. This function only orchestrates: it fetches the
+    address lists, builds rows, and prints what the renderer returns.
+
+    ``show_fidelity_bonds=False`` (``wallet.info_show_fidelity_bonds``)
+    drops the fidelity bond branch; the addresses are still fetched so a
+    one-line notice can point at funded hidden bonds instead of hiding
+    them silently, and the legend loses its fb-a/fb-x/lock/redeem rows.
+    """
+    from jmwallet.cli.info_render import (
+        BRANCH_NAME_WIDTH,
+        compute_widths,
+        render_branch_summary,
+        render_branch_table,
+        render_hidden_note,
+        render_legend,
+        render_mixdepth_summary,
+        separator_width,
+    )
+    from jmwallet.history import get_pending_transactions
+    from jmwallet.wallet.constants import FIDELITY_BOND_BRANCH
+    from jmwallet.wallet.rows import (
+        EXTERNAL_BRANCH,
+        INTERNAL_BRANCH,
+        BranchSummaryRow,
+        HiddenRow,
+        Row,
+        UtxoRow,
+        build_branch_rows,
+        summarize_branch,
+        summarize_mixdepth,
+    )
+
+    for line in render_legend(show_fidelity_bonds=show_fidelity_bonds):
+        print(line)
+
+    # Get pending transactions to mark addresses (scoped to active wallet,
+    # #473) -- same source as the legacy view.
+    pending_txs = get_pending_transactions(
+        wallet.data_dir, wallet_fingerprint=wallet.wallet_fingerprint
+    )
+    pending_addresses: set[str] = set()
+    for entry in pending_txs:
+        if entry.destination_address:
+            pending_addresses.add(entry.destination_address)
+        if entry.change_address:
+            pending_addresses.add(entry.change_address)
+
+    coin_type = 0 if wallet.network == "mainnet" else 1
+
+    # Pass 1: fetch the addresses and build the row model for every branch,
+    # so the amount column width can be global across all tables (the `sats`
+    # edge lines up in every mixdepth).
+    plan: list[tuple[int, str, list[tuple[int, str, str, list[Row]]]]] = []
+    # md -> one-line notice standing in for the hidden fidelity bond table
+    hidden_fb_notices: dict[int, str] = {}
+    for md in range(wallet.mixdepth_count):
+        branches: list[tuple[int, str, str, list[Row]]] = []
+        # Fidelity bond branch first (only for mixdepth 0): bonds are
+        # fundamentally different from the day-to-day addresses, so they
+        # read better up front than wedged between the regular branches.
+        # Fetched even when hidden (wallet.info_show_fidelity_bonds=false)
+        # so the notice can count funded bonds instead of hiding them
+        # silently.
+        if md == 0:
+            bond_addresses = wallet.get_fidelity_bond_addresses_info(gap_limit)
+            if show_fidelity_bonds and bond_addresses:
+                bond_path = f"m/84'/{coin_type}'/0'/{FIDELITY_BOND_BRANCH}"
+                bond_rows = build_branch_rows(
+                    bond_addresses,
+                    mixdepth=md,
+                    branch=FIDELITY_BOND_BRANCH,
+                    pending_addresses=pending_addresses,
+                    show_empty=show_empty,
+                )
+                branches.append((FIDELITY_BOND_BRANCH, "fidelity bond addr.", bond_path, bond_rows))
+            elif not show_fidelity_bonds:
+                notice = _fidelity_bond_hidden_notice(bond_addresses, coin_type)
+                if notice is not None:
+                    hidden_fb_notices[md] = notice
+
+        # External addresses (receive / deposit), then internal (change /
+        # CJ output) -- same order and header format as the legacy view.
+        for branch, branch_name in (
+            (EXTERNAL_BRANCH, "external addresses"),
+            (INTERNAL_BRANCH, "internal addresses"),
+        ):
+            addresses = wallet.get_address_info_for_mixdepth(
+                md, branch, gap_limit, used_addresses, history_addresses
+            )
+            branch_path = f"m/84'/{coin_type}'/{md}'/{branch}"
+            rows = build_branch_rows(
+                addresses,
+                mixdepth=md,
+                branch=branch,
+                pending_addresses=pending_addresses,
+                show_empty=show_empty,
+            )
+            branches.append((branch, branch_name, branch_path, rows))
+
+        # Get account zpub (BIP84 format for native segwit)
+        plan.append((md, wallet.get_account_zpub(md), branches))
+
+    # Global amount-column width over the regular branches only; the
+    # fidelity-bond raster is fully independent and sizes its own amount
+    # column from the bond rows.
+    num_width = max(
+        (
+            len(f"{row.utxo.value:,}")
+            for _, _, md_branches in plan
+            for branch, _, _, rows in md_branches
+            if branch != FIDELITY_BOND_BRANCH
+            for row in rows
+            if isinstance(row, UtxoRow)
+        ),
+        default=1,
+    )
+    fb_num_width = max(
+        (
+            len(f"{row.utxo.value:,}")
+            for _, _, md_branches in plan
+            for branch, _, _, rows in md_branches
+            if branch == FIDELITY_BOND_BRANCH
+            for row in rows
+            if isinstance(row, UtxoRow)
+        ),
+        default=1,
+    )
+
+    # No per-table hidden-address notes in the full view (they interrupt the
+    # table flow): pull the HiddenRows out of the plan and aggregate them
+    # into a single note at the end of the page.
+    hidden_total = 0
+    for _md, _zpub, md_branches in plan:
+        for i, (branch, branch_name, branch_path, rows) in enumerate(md_branches):
+            visible_rows: list[Row] = []
+            for row in rows:
+                if isinstance(row, HiddenRow):
+                    hidden_total += row.hidden_count
+                else:
+                    visible_rows.append(row)
+            md_branches[i] = (branch, branch_name, branch_path, visible_rows)
+
+    # Global column alignment: every regular branch table on the page uses
+    # the same width vector, so all pipe columns line up across mixdepths.
+    # Fidelity-bond tables keep their own fully independent raster (wider
+    # addresses, fb-date, own amount width).
+    regular_widths = compute_widths(
+        [
+            row
+            for _, _, md_branches in plan
+            for branch, _, _, rows in md_branches
+            if branch != FIDELITY_BOND_BRANCH
+            for row in rows
+        ],
+        fidelity_bond=False,
+        num_width=num_width,
+    )
+    fb_widths = compute_widths(
+        [
+            row
+            for _, _, md_branches in plan
+            for branch, _, _, rows in md_branches
+            if branch == FIDELITY_BOND_BRANCH
+            for row in rows
+        ],
+        fidelity_bond=True,
+        num_width=fb_num_width,
+    )
+
+    # Every dashed line on the page shares one length: the widest table
+    # separator. Shorter table separators are right-extended with dashes
+    # (sep_width below); the page separators print at this width.
+    page_width = separator_width(regular_widths)
+    if any(
+        branch == FIDELITY_BOND_BRANCH
+        for _, _, md_branches in plan
+        for branch, _, _, _ in md_branches
+    ):
+        page_width = max(page_width, separator_width(fb_widths))
+
+    # Pass 2: render. Header names pad to a common width (fixed padding
+    # instead of unpredictable terminal tab stops), so the derivation paths
+    # line up; the account zpub appears once per mixdepth, in the external
+    # branch header.
+    print("-" * page_width)
+    for md, zpub, md_branches in plan:
+        print()  # Visual separator before mixdepth output
+        print(colorize(f"Mixdepth {md}", ANSI_BOLD_CYAN))
+
+        # The hidden fidelity bond table is replaced by a one-line notice
+        # exactly where the table would be (before the regular branches).
+        if md in hidden_fb_notices:
+            print()
+            print(hidden_fb_notices[md])
+
+        branch_summaries: list[BranchSummaryRow] = []
+        for branch, branch_name, branch_path, rows in md_branches:
+            print()  # Visual separator before each branch block
+            padded_name = branch_name.ljust(BRANCH_NAME_WIDTH)
+            header = f"{colorize(padded_name, ANSI_CYAN)}  {branch_path}"
+            # The external branch header carries the account zpub (legacy).
+            if branch == EXTERNAL_BRANCH:
+                header += f"  {zpub}"
+            print(header)
+
+            for line in render_branch_table(
+                rows,
+                fidelity_bond=branch == FIDELITY_BOND_BRANCH,
+                num_width=fb_num_width if branch == FIDELITY_BOND_BRANCH else num_width,
+                widths=fb_widths if branch == FIDELITY_BOND_BRANCH else regular_widths,
+                sep_width=page_width,
+            ):
+                print(line)
+            summary = summarize_branch(rows, mixdepth=md, branch=branch)
+            branch_summaries.append(summary)
+            print(render_branch_summary(summary))
+
+        print(render_mixdepth_summary(summarize_mixdepth(branch_summaries, mixdepth=md)))
+        print("-" * page_width)
+
+    if hidden_total > 0:
+        # Single aggregated hidden-address note for the whole page.
+        print(render_hidden_note(hidden_total))
 
 
 @app.command("verify-password")

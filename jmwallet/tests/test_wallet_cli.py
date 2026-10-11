@@ -313,30 +313,30 @@ class TestExtendedInfoColorGating:
     """
 
     def test_colorize_suppressed_when_not_a_tty(self) -> None:
-        from jmwallet.cli import wallet as wallet_cli
+        from jmwallet.cli import ansi
 
         with patch("sys.stdout.isatty", return_value=False):
-            out = wallet_cli._colorize("Mixdepth 0", wallet_cli._ANSI_BOLD_CYAN)
+            out = ansi.colorize("Mixdepth 0", ansi.ANSI_BOLD_CYAN)
         assert out == "Mixdepth 0"
         assert "\033[" not in out
 
     def test_colorize_emitted_on_a_tty(self) -> None:
-        from jmwallet.cli import wallet as wallet_cli
+        from jmwallet.cli import ansi
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NO_COLOR", None)
             with patch("sys.stdout.isatty", return_value=True):
-                out = wallet_cli._colorize("Mixdepth 0", wallet_cli._ANSI_BOLD_CYAN)
-        assert out.startswith(wallet_cli._ANSI_BOLD_CYAN)
-        assert out.endswith(wallet_cli._ANSI_RESET)
+                out = ansi.colorize("Mixdepth 0", ansi.ANSI_BOLD_CYAN)
+        assert out.startswith(ansi.ANSI_BOLD_CYAN)
+        assert out.endswith(ansi.ANSI_RESET)
         assert "Mixdepth 0" in out
 
     def test_no_color_env_disables_colors_even_on_tty(self) -> None:
-        from jmwallet.cli import wallet as wallet_cli
+        from jmwallet.cli import ansi
 
         with patch.dict(os.environ, {"NO_COLOR": "1"}, clear=False):
             with patch("sys.stdout.isatty", return_value=True):
-                out = wallet_cli._colorize("Mixdepth 0", wallet_cli._ANSI_BOLD_CYAN)
+                out = ansi.colorize("Mixdepth 0", ansi.ANSI_BOLD_CYAN)
         assert out == "Mixdepth 0"
 
 

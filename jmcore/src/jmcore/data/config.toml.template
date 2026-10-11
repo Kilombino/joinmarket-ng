@@ -256,6 +256,13 @@
 # Increase only if you have a deliberate need to pay fees above 1000 sat/vB.
 # max_fee_rate_sat_vb = 1000
 
+# Show the fidelity bond branch in the extended wallet info views
+# (`jm-wallet info --extended`). Fidelity bonds are managed separately via
+# `jm-wallet bonds`; set to false to keep the day-to-day view free of bond
+# addresses. When hidden, a one-line notice still points out funded bonds
+# (active/expired count and total sats) so they do not vanish silently.
+# info_show_fidelity_bonds = true
+
 # Mnemonic file settings (optional defaults)
 # mnemonic_file = ""            # Path to mnemonic file
 # Enable BIP39 onboarding and prompting for unregistered wallets. Default: false.

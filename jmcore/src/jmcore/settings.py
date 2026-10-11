@@ -530,6 +530,16 @@ class WalletSettings(BaseModel):
             "oracles from draining the wallet."
         ),
     )
+    info_show_fidelity_bonds: bool = Field(
+        default=True,
+        description=(
+            "Show the fidelity bond branch in the extended wallet info views "
+            "(``jm-wallet info --extended``). Bonds are fundamentally different "
+            "from the day-to-day addresses and are managed via ``jm-wallet "
+            "bonds``; set to false to keep the info views free of bond "
+            "addresses (a one-line notice still points out funded hidden bonds)."
+        ),
+    )
     mnemonic_file: str | None = Field(
         default=None,
         description="Default path to mnemonic file",
