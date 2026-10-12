@@ -56,10 +56,12 @@ def test_notification_falls_back_to_legacy_cj_amount() -> None:
 def test_gotify_notification_sends_token_in_header_and_payload() -> None:
     notifier = _load_notifier()
     token = "canary-gotify-token"
-    setattr(notifier, "GOTIFY_URL", "https://gotify.example.test")
-    setattr(notifier, "GOTIFY_TOKEN", token)
 
-    with patch.object(notifier, "urlopen", return_value=nullcontext()) as urlopen_mock:
+    with (
+        patch.object(notifier, "GOTIFY_URL", "https://gotify.example.test"),
+        patch.object(notifier, "GOTIFY_TOKEN", token),
+        patch.object(notifier, "urlopen", return_value=nullcontext()) as urlopen_mock,
+    ):
         assert notifier.send_gotify_notification(
             "CoinJoin complete", "Sent 123 sats", 7
         )
@@ -98,10 +100,12 @@ def test_gotify_notification_failure_does_not_log_token(
 ) -> None:
     notifier = _load_notifier()
     token = "canary-gotify-token"
-    setattr(notifier, "GOTIFY_URL", "https://gotify.example.test")
-    setattr(notifier, "GOTIFY_TOKEN", token)
 
-    with patch.object(notifier, "urlopen", side_effect=error):
+    with (
+        patch.object(notifier, "GOTIFY_URL", "https://gotify.example.test"),
+        patch.object(notifier, "GOTIFY_TOKEN", token),
+        patch.object(notifier, "urlopen", side_effect=error),
+    ):
         with caplog.at_level(logging.ERROR, logger=notifier.logger.name):
             assert not notifier.send_gotify_notification(
                 "CoinJoin complete", "Sent 123 sats", 7

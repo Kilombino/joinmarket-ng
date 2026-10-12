@@ -14,6 +14,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 from jmcore.commitment_blacklist import set_blacklist_path
 from jmcore.crypto import NickIdentity
@@ -849,6 +850,8 @@ class MakerBot(BackgroundTasksMixin, ProtocolHandlersMixin, DirectConnectionMixi
             if not self.running or self._generation() is not old:
                 await self._close_generation(replacement)
                 return False
+            # Identity narrowing against an optional lookup can lose the earlier non-null check.
+            old = cast(MakerGeneration, old)
             self.generations[replacement.generation_id] = replacement
             self._activate_generation(replacement)
             self._publish_nick_change(old.nick_identity.nick, replacement.nick_identity.nick)
@@ -1771,7 +1774,7 @@ class MakerBot(BackgroundTasksMixin, ProtocolHandlersMixin, DirectConnectionMixi
         return (
             generation.generation_id == self.current_generation_id
             and self._generation(generation.generation_id) is generation
-            and generation.state is GenerationState.ACCEPTING
+            and cast(MakerGeneration, generation).state is GenerationState.ACCEPTING
         )
 
     def _public_offer_payloads(self, offers: list[Offer]) -> dict[int, str | None]:

@@ -78,6 +78,7 @@ ignore = [
     "S110",
     "PLR0912",
     "PLR0913",
+    "PLR0917",  # Positional argument count, like the existing total argument exemption.
     "PLR0915",
     "PLR2004",
     "PLW2901",

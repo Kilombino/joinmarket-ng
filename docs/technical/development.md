@@ -223,6 +223,11 @@ the script retains its check-mode exit status of 1 when files change.
 Maintenance mode exits nonzero if required help or a target README is unavailable,
 and failed generation leaves that README's existing help unchanged.
 If Prek modifies files, review those changes and rerun it until all checks pass.
+Hook upgrades can also change lint rules or type-checker behavior. Investigate
+remaining failures instead of applying unsafe fixes indiscriminately. The root
+`ruff.toml` explicitly preserves the pre-0.16 default lint policy for scripts and
+tests; components use their own `pyproject.toml` configurations. Review newly
+enabled rules in those configurations when upgrading Ruff.
 
 `prek autoupdate` refreshes remote hook revisions, not every tool pin. Review
 explicit local hook pins (such as `complexipy`) and CI tool versions and action

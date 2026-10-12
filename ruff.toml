@@ -1,0 +1,4 @@
+# Keep root scripts and tests on the pre-0.16 default policy across tool updates.
+# Components retain their independent pyproject.toml lint configurations.
+[lint]
+select = ["E4", "E7", "E9", "F"]
