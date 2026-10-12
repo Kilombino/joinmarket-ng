@@ -300,6 +300,75 @@ def test_valid_existing_wallet_signature_is_preserved(wallet_service) -> None:
     assert second.psbt == first.psbt
 
 
+@pytest.mark.parametrize("psbt_version", [PSBT_VERSION_0, PSBT_VERSION_2])
+@pytest.mark.parametrize("locktime", [2_148_595_200, 4_099_766_400], ids=["2038-02", "2099-12"])
+def test_high_locktime_psbt_signing_preserves_existing_signatures(
+    wallet_service: WalletService, psbt_version: int, locktime: int
+) -> None:
+    """A bond's high locktime affects both its own input and ordinary SegWit inputs."""
+    regular_records, regular_pubkey, _ = _regular_input_records(wallet_service, 0, 0, 0, 100_000)
+    bond_address = wallet_service.get_fidelity_bond_address(0, locktime)
+    bond_key = wallet_service.get_key_for_address(bond_address)
+    assert bond_key is not None
+    bond_pubkey = bond_key.get_public_key_bytes(compressed=True)
+    witness_script = wallet_service.get_fidelity_bond_script(0, locktime)
+    bond_records = [
+        (
+            bytes([PSBT_IN_WITNESS_UTXO]),
+            _witness_utxo(200_000, b"\x00\x20" + sha256(witness_script).digest()),
+        ),
+        (bytes([PSBT_IN_WITNESS_SCRIPT]), witness_script),
+    ]
+    raw = _build_psbt(
+        [
+            TxInput.from_hex("12" * 32, 0, sequence=0xFFFFFFFE),
+            TxInput.from_hex("34" * 32, 1, sequence=0xFFFFFFFE),
+        ],
+        [TxOutput(value=299_000, script=b"\x00\x14" + b"\x77" * 20)],
+        [regular_records, bond_records],
+        locktime=locktime,
+    )
+    if psbt_version == PSBT_VERSION_2:
+        raw = _to_v2(raw)
+    original = parse_psbt(raw)
+
+    first_plan = wallet_service.prepare_psbt_signing(raw, scan_range=0)
+    first = wallet_service.sign_psbt(first_plan)
+    assert first.signed_indices == (0, 1)
+    assert first.already_signed_indices == ()
+    signed = parse_psbt(first.psbt)
+    assert signed.version == psbt_version
+    assert signed.transaction.locktime == locktime
+    assert signed.unsigned_tx == original.unsigned_tx
+    signatures = []
+    for input_map, pubkey in zip(signed.input_maps, (regular_pubkey, bond_pubkey), strict=True):
+        signatures.append(
+            next(
+                record.value
+                for record in input_map.records
+                if record.key == bytes([PSBT_IN_PARTIAL_SIG]) + pubkey
+            )
+        )
+    assert verify_p2wpkh_signature(
+        original.transaction,
+        0,
+        create_p2wpkh_script_code(regular_pubkey),
+        100_000,
+        signatures[0],
+        regular_pubkey,
+    )
+    assert verify_p2wsh_signature(
+        original.transaction, 1, witness_script, 200_000, signatures[1], bond_pubkey
+    )
+
+    second_plan = wallet_service.prepare_psbt_signing(first.psbt, scan_range=0)
+    assert all(input_plan.already_signed for input_plan in second_plan.inputs)
+    second = wallet_service.sign_psbt(second_plan)
+    assert second.signed_indices == ()
+    assert second.already_signed_indices == (0, 1)
+    assert second.psbt == first.psbt
+
+
 @pytest.mark.parametrize(
     ("locktime", "sequence", "message"),
     [
