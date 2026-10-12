@@ -62,10 +62,6 @@ from maker.maker_session import MakerSession, PendingSignedRound
 from maker.offers import OfferManager
 from maker.protocol_handlers import ProtocolHandlersMixin
 from maker.rate_limiting import (
-    DEFAULT_DIRECT_ORDERBOOK_RESPONSE_BURST,
-    DEFAULT_DIRECT_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
-    DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_BURST,
-    DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
     DEFAULT_HP2_ADMISSION_BURST,
     DEFAULT_HP2_ADMISSION_REFILL_PER_SECOND,
     DEFAULT_HP2_RELAY_WORK_BURST,
@@ -219,12 +215,12 @@ class MakerBot(BackgroundTasksMixin, ProtocolHandlersMixin, DirectConnectionMixi
         )
 
         self._directory_orderbook_response_limiter = ProcessWideTokenBucket(
-            DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_BURST,
-            DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
+            config.directory_orderbook_response_burst,
+            config.directory_orderbook_response_refill_per_second,
         )
         self._direct_orderbook_response_limiter = ProcessWideTokenBucket(
-            DEFAULT_DIRECT_ORDERBOOK_RESPONSE_BURST,
-            DEFAULT_DIRECT_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
+            config.direct_orderbook_response_burst,
+            config.direct_orderbook_response_refill_per_second,
         )
         self._orderbook_stats_started_at = time.monotonic()
         self._orderbook_response_counts = {

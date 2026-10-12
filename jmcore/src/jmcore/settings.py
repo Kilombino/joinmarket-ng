@@ -968,6 +968,33 @@ class MakerSettings(BaseModel):
             "and letting the background reconnect task take over"
         ),
     )
+    # Aggregate response admissions, independent of per-peer limits.
+    # Keep bursts within binary64's safe integer range for unit token decrements.
+    directory_orderbook_response_burst: int = Field(
+        default=200,
+        ge=1,
+        le=2**53 - 1,
+        description="Maker-wide directory orderbook response burst capacity (requests)",
+    )
+    directory_orderbook_response_refill_per_second: float = Field(
+        default=20.0,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="Maker-wide directory orderbook response refill rate (requests per second)",
+    )
+    direct_orderbook_response_burst: int = Field(
+        default=20,
+        ge=1,
+        le=2**53 - 1,
+        description="Maker-wide direct orderbook response burst capacity (requests)",
+    )
+    direct_orderbook_response_refill_per_second: float = Field(
+        default=2.0,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="Maker-wide direct orderbook response refill rate (requests per second)",
+    )
+
     # Orderbook rate limiting
     orderbook_rate_limit: int = Field(
         default=1,

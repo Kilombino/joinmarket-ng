@@ -14,6 +14,12 @@ from jmcore.tor_control import HiddenServiceDoSConfig
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from maker.mixdepth_selection import MixdepthSelectionPolicy
+from maker.rate_limiting import (
+    DEFAULT_DIRECT_ORDERBOOK_RESPONSE_BURST,
+    DEFAULT_DIRECT_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
+    DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_BURST,
+    DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
+)
 
 
 def normalize_decimal_string(v: str | float | int) -> str:
@@ -458,6 +464,33 @@ class MakerConfig(WalletConfig):
         default=100,
         ge=1,
         description="Maximum burst messages per peer (default: 100, allows ~10s at max rate)",
+    )
+
+    # Aggregate response admissions, independent of per-peer limits.
+    # Keep bursts within binary64's safe integer range for unit token decrements.
+    directory_orderbook_response_burst: int = Field(
+        default=DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_BURST,
+        ge=1,
+        le=2**53 - 1,
+        description="Maker-wide directory orderbook response burst capacity (requests)",
+    )
+    directory_orderbook_response_refill_per_second: float = Field(
+        default=DEFAULT_DIRECTORY_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="Maker-wide directory orderbook response refill rate (requests per second)",
+    )
+    direct_orderbook_response_burst: int = Field(
+        default=DEFAULT_DIRECT_ORDERBOOK_RESPONSE_BURST,
+        ge=1,
+        le=2**53 - 1,
+        description="Maker-wide direct orderbook response burst capacity (requests)",
+    )
+    direct_orderbook_response_refill_per_second: float = Field(
+        default=DEFAULT_DIRECT_ORDERBOOK_RESPONSE_REFILL_PER_SECOND,
+        gt=0.0,
+        allow_inf_nan=False,
+        description="Maker-wide direct orderbook response refill rate (requests per second)",
     )
 
     # Rate limiting for orderbook requests (protects against spam attacks)

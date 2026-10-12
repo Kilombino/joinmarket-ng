@@ -147,7 +147,8 @@ signing and network resources. These limits apply with or without a fidelity bon
   budget does not consume the other transport's capacity.
 - One admission covers all of that maker's offers and, for directory requests, all
   connected directory sends. It is not charged per offer or per directory.
-  These aggregate budgets are fixed; the per-peer `orderbook_*` settings do not change them.
+  These budgets are configurable independently of per-peer `orderbook_*` limits;
+  see the `[maker]` section in `config.toml.template`.
 
 `Suppressing !orderbook response (directory response budget exhausted; refills automatically)`
 means a response was dropped, not queued. No restart is needed to replenish capacity.

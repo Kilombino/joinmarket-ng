@@ -67,6 +67,68 @@ def temp_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return data_dir
 
 
+class TestOrderbookResponseBudgets:
+    """Older configs keep defaults; operators can override either transport."""
+
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {},
+            {"directory_orderbook_response_burst": 400},
+            {
+                "directory_orderbook_response_burst": 400,
+                "directory_orderbook_response_refill_per_second": 40.5,
+                "direct_orderbook_response_burst": 50,
+                "direct_orderbook_response_refill_per_second": 5.5,
+            },
+        ],
+        ids=["older-config", "partial-config", "complete-config"],
+    )
+    def test_toml_budgets(self, temp_data_dir: Path, overrides: dict[str, int | float]) -> None:
+        config_path = temp_data_dir / "config.toml"
+        contents = "[maker]\n" + "".join(f"{key} = {value}\n" for key, value in overrides.items())
+        config_path.write_text(contents)
+        expected = {
+            "directory_orderbook_response_burst": 200,
+            "directory_orderbook_response_refill_per_second": 20.0,
+            "direct_orderbook_response_burst": 20,
+            "direct_orderbook_response_refill_per_second": 2.0,
+        } | overrides
+
+        settings = get_settings()
+        for field, value in expected.items():
+            assert getattr(settings.maker, field) == value
+        assert config_path.read_text() == contents
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("directory_orderbook_response_burst", 400),
+            ("directory_orderbook_response_refill_per_second", 40.5),
+            ("direct_orderbook_response_burst", 50),
+            ("direct_orderbook_response_refill_per_second", 5.5),
+        ],
+    )
+    def test_env_overrides_toml(
+        self, temp_data_dir: Path, monkeypatch: pytest.MonkeyPatch, field: str, value: int | float
+    ) -> None:
+        (temp_data_dir / "config.toml").write_text(f"[maker]\n{field} = 1\n")
+        monkeypatch.setenv(f"MAKER__{field.upper()}", str(value))
+        assert getattr(get_settings().maker, field) == value
+
+    @pytest.mark.parametrize(
+        "field", ["directory_orderbook_response_burst", "direct_orderbook_response_burst"]
+    )
+    def test_environment_burst_boundaries(
+        self, monkeypatch: pytest.MonkeyPatch, field: str
+    ) -> None:
+        monkeypatch.setenv(f"MAKER__{field.upper()}", str(2**53 - 1))
+        assert getattr(JoinMarketSettings().maker, field) == 2**53 - 1
+        monkeypatch.setenv(f"MAKER__{field.upper()}", str(2**53))
+        with pytest.raises(ValidationError, match=field):
+            JoinMarketSettings()
+
+
 class TestConfigTemplate:
     """Tests for config template generation."""
 

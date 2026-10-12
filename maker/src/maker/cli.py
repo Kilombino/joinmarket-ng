@@ -441,6 +441,14 @@ def build_maker_config(
         directory_reconnect_interval=settings.maker.directory_reconnect_interval,
         directory_reconnect_max_retries=settings.maker.directory_reconnect_max_retries,
         directory_startup_timeout=settings.maker.directory_startup_timeout,
+        directory_orderbook_response_burst=settings.maker.directory_orderbook_response_burst,
+        directory_orderbook_response_refill_per_second=(
+            settings.maker.directory_orderbook_response_refill_per_second
+        ),
+        direct_orderbook_response_burst=settings.maker.direct_orderbook_response_burst,
+        direct_orderbook_response_refill_per_second=(
+            settings.maker.direct_orderbook_response_refill_per_second
+        ),
         orderbook_rate_limit=settings.maker.orderbook_rate_limit,
         orderbook_rate_interval=settings.maker.orderbook_rate_interval,
         orderbook_violation_ban_threshold=settings.maker.orderbook_violation_ban_threshold,

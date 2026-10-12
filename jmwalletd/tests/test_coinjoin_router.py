@@ -1267,6 +1267,10 @@ class TestStartMaker:
         mock_settings.maker.orderbook_violation_warning_threshold = 11
         mock_settings.maker.orderbook_violation_severe_threshold = 51
         mock_settings.maker.orderbook_ban_duration = 7200.0
+        mock_settings.maker.directory_orderbook_response_burst = 400
+        mock_settings.maker.directory_orderbook_response_refill_per_second = 40.5
+        mock_settings.maker.direct_orderbook_response_burst = 50
+        mock_settings.maker.direct_orderbook_response_refill_per_second = 5.5
         mock_get_settings.return_value = mock_settings
 
         resp = client.post(
@@ -1341,6 +1345,10 @@ class TestStartMaker:
         assert maker_config.orderbook_violation_warning_threshold == 11
         assert maker_config.orderbook_violation_severe_threshold == 51
         assert maker_config.orderbook_ban_duration == 7200.0
+        assert maker_config.directory_orderbook_response_burst == 400
+        assert maker_config.directory_orderbook_response_refill_per_second == 40.5
+        assert maker_config.direct_orderbook_response_burst == 50
+        assert maker_config.direct_orderbook_response_refill_per_second == 5.5
 
     @patch("jmwalletd.routers.coinjoin.remove_nick_state")
     @patch("jmwalletd.routers.coinjoin.write_nick_state")

@@ -508,7 +508,15 @@
 # message_rate_limit = 10   # Messages per second per peer (sustained)
 # message_burst_limit = 100 # Max burst messages per peer
 
-# Orderbook rate limiting (protects against orderbook spam attacks)
+# Maker-wide response budgets, independent for directory and direct requests.
+# Positive burst capacities (requests) and finite, positive refill rates (requests/second).
+# Higher values permit more signing/network load under spam. Restart the maker to apply.
+# directory_orderbook_response_burst = 200
+# directory_orderbook_response_refill_per_second = 20.0
+# direct_orderbook_response_burst = 20
+# direct_orderbook_response_refill_per_second = 2.0
+
+# Per-peer orderbook rate limiting (protects against orderbook spam attacks)
 # orderbook_rate_limit = 1                  # Max responses per peer per interval
 # orderbook_rate_interval = 10.0            # Interval in seconds
 # orderbook_violation_warning_threshold = 10 # Start exponential backoff after N violations

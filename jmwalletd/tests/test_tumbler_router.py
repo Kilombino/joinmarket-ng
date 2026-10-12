@@ -659,6 +659,10 @@ class TestStartPlan:
                 "orderbook_violation_warning_threshold": 11,
                 "orderbook_violation_severe_threshold": 51,
                 "orderbook_ban_duration": 7200.0,
+                "directory_orderbook_response_burst": 400,
+                "directory_orderbook_response_refill_per_second": 40.5,
+                "direct_orderbook_response_burst": 50,
+                "direct_orderbook_response_refill_per_second": 5.5,
                 "dual_offers": True,
             },
             wallet={"max_fee_rate_sat_vb": 777.0},
@@ -738,6 +742,10 @@ class TestStartPlan:
         assert maker_config.orderbook_violation_warning_threshold == 11
         assert maker_config.orderbook_violation_severe_threshold == 51
         assert maker_config.orderbook_ban_duration == 7200.0
+        assert maker_config.directory_orderbook_response_burst == 400
+        assert maker_config.directory_orderbook_response_refill_per_second == 40.5
+        assert maker_config.direct_orderbook_response_burst == 50
+        assert maker_config.direct_orderbook_response_refill_per_second == 5.5
         assert maker_config.offer_type is OfferType.SW0_ABSOLUTE
         assert maker_config.cj_fee_absolute == 0
         assert maker_config.no_fidelity_bond is True

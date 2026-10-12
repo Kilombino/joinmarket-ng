@@ -107,6 +107,10 @@ async def test_bond_sent_only_in_privmsg_response():
     mock_config.orderbook_violation_warning_threshold = 3
     mock_config.orderbook_violation_severe_threshold = 10
     mock_config.orderbook_ban_duration = 3600
+    mock_config.directory_orderbook_response_burst = 200
+    mock_config.directory_orderbook_response_refill_per_second = 20.0
+    mock_config.direct_orderbook_response_burst = 20
+    mock_config.direct_orderbook_response_refill_per_second = 2.0
     # Directory pool plumbing
     mock_config.directory_servers = []
     mock_config.stream_isolation = False
