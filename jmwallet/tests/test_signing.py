@@ -2,8 +2,12 @@
 Tests for transaction signing utilities.
 """
 
+import struct
+
 import pytest
+from jmcore.btc_script import mk_freeze_script
 from jmcore.constants import SECP256K1_N
+from jmcore.timenumber import TIMENUMBER_COUNT, timenumber_to_timestamp
 
 from jmwallet.wallet.bip32 import HDKey, mnemonic_to_seed
 from jmwallet.wallet.signing import (
@@ -366,6 +370,71 @@ class TestSigning:
                 private_key=test_key.private_key,
                 sighash_type=0x83,  # SIGHASH_SINGLE|ANYONECANPAY
             )
+
+    @pytest.mark.parametrize(
+        "locktime", [0, 0x7FFFFFFF, 0x80000000, 2_148_595_200, 4_099_766_400, 0xFFFFFFFF]
+    )
+    def test_compute_sighash_segwit_unsigned_locktime(self, test_key, locktime):
+        """nLockTime is an unsigned field of the BIP-143 preimage."""
+        txid_le = bytes(range(32))
+        sequence = 0xFFFFFFFD
+        output_script = bytes.fromhex("0014" + "11" * 20)
+        tx = Transaction(
+            version=2,
+            has_witness=True,
+            inputs=[TxInput(txid_le=txid_le, vout=1, scriptsig=b"", sequence=sequence)],
+            outputs=[TxOutput(value=50000, script=output_script)],
+            locktime=locktime,
+            witnesses=[],
+        )
+        script_code = create_p2wpkh_script_code(test_key.get_public_key_bytes(compressed=True))
+        outpoint = txid_le + struct.pack("<I", 1)
+        preimage = (
+            struct.pack("<i", 2)
+            + hash256(outpoint)
+            + hash256(struct.pack("<I", sequence))
+            + outpoint
+            + encode_varint(len(script_code))
+            + script_code
+            + struct.pack("<q", 100000)
+            + struct.pack("<I", sequence)
+            + hash256(struct.pack("<q", 50000) + encode_varint(len(output_script)) + output_script)
+            + struct.pack("<I", locktime)
+            + struct.pack("<I", 1)
+        )
+
+        sighash = compute_sighash_segwit(
+            tx=tx, input_index=0, script_code=script_code, value=100000, sighash_type=1
+        )
+
+        assert sighash == hash256(preimage)
+
+    def test_sign_p2wsh_bond_locked_until_2099(self, test_mnemonic):
+        """A bond locked until the last timenumber can be spent."""
+        locktime = timenumber_to_timestamp(TIMENUMBER_COUNT - 1)
+        key = HDKey.from_seed(mnemonic_to_seed(test_mnemonic)).derive(
+            f"m/84'/0'/0'/2/{TIMENUMBER_COUNT - 1}"
+        )
+        pubkey = key.get_public_key_bytes(compressed=True)
+        witness_script = mk_freeze_script(pubkey.hex(), locktime)
+        tx = Transaction(
+            version=2,
+            has_witness=True,
+            inputs=[TxInput(txid_le=bytes(32), vout=0, scriptsig=b"", sequence=0xFFFFFFFD)],
+            outputs=[TxOutput(value=99000, script=bytes.fromhex("0014" + "00" * 20))],
+            locktime=locktime,
+            witnesses=[],
+        )
+
+        signature = sign_p2wsh_input(
+            tx=tx,
+            input_index=0,
+            witness_script=witness_script,
+            value=100000,
+            private_key=key.private_key,
+        )
+
+        assert verify_p2wsh_signature(tx, 0, witness_script, 100000, signature, pubkey)
 
 
 class TestSignatureVerification:
