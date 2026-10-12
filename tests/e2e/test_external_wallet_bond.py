@@ -18,19 +18,18 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from bitcointx.core.key import CKey
 import pytest
+from bitcointx.core.key import CKey
 from jmcore.btc_script import mk_freeze_script
 from jmcore.crypto import bitcoin_message_hash_bytes
 from jmcore.timenumber import get_nearest_valid_locktime
-from loguru import logger
-
 from jmwallet.wallet.address import script_to_p2wsh_address
 from jmwallet.wallet.bond_registry import (
     BondRegistry,
     FidelityBondInfo,
     save_registry,
 )
+from loguru import logger
 
 
 def create_external_wallet_bond(

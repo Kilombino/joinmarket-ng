@@ -53,12 +53,12 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
  Clear the list of ignored makers.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file          PATH  Config file path (decoupled from data dir).     │
-│                              Defaults to <data-dir>/config.toml              │
-│                              [env var: JOINMARKET_CONFIG_FILE]               │
-│ --data-dir     -d      PATH  Data directory for JoinMarket files             │
-│                              [env var: JOINMARKET_DATA_DIR]                  │
-│ --help                       Show this message and exit.                     │
+│ --config-file          <path>  Config file path (decoupled from data dir).   │
+│                                Defaults to <data-dir>/config.toml            │
+│                                [env var: JOINMARKET_CONFIG_FILE]             │
+│ --data-dir     -d      <path>  Data directory for JoinMarket files           │
+│                                [env var: JOINMARKET_DATA_DIR]                │
+│ --help                         Show this message and exit.                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -79,32 +79,32 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
  priority.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --amount           -a                     INTEGER           Amount in sats   │
+│ --amount           -a                     <int>             Amount in sats   │
 │                                                             (0 for sweep;    │
 │                                                             with             │
 │                                                             --select-utxos,  │
 │                                                             defaults to      │
 │                                                             sweep)           │
-│ --backend          -b                     TEXT              Backend type:    │
+│ --backend          -b                     <str>             Backend type:    │
 │                                                             descriptor_wall… │
 │                                                             | neutrino       │
-│ --bitcoin-network                         [mainnet|testnet  Bitcoin network  │
-│                                           |signet|regtest]  for addresses    │
+│ --bitcoin-network                         <mainnet|testnet  Bitcoin network  │
+│                                           |signet|regtest>  for addresses    │
 │                                                             (defaults to     │
 │                                                             --network)       │
-│ --block-target                            INTEGER           Target blocks    │
+│ --block-target                            <int>             Target blocks    │
 │                                                             for fee          │
 │                                                             estimation       │
 │                                                             (1-1008). Cannot │
 │                                                             be used with     │
 │                                                             neutrino.        │
-│ --bond-exponent                           FLOAT             Exponent for     │
+│ --bond-exponent                           <float>           Exponent for     │
 │                                                             fidelity bond    │
 │                                                             value            │
 │                                                             calculation      │
 │                                                             [env var:        │
 │                                                             BOND_VALUE_EXPO… │
-│ --bondless-allow…                         FLOAT             Fraction of      │
+│ --bondless-allow…                         <float>           Fraction of      │
 │                                                             allowance slots  │
 │                                                             chosen uniformly │
 │                                                             from zero-fee    │
@@ -117,28 +117,28 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
 │                                                             offers           │
 │                                                             [env var:        │
 │                                                             BONDLESS_REQUIR… │
-│ --config-file                             PATH              Config file path │
+│ --config-file                             <path>            Config file path │
 │                                                             (decoupled from  │
 │                                                             data dir).       │
 │                                                             Defaults to      │
 │                                                             <data-dir>/conf… │
 │                                                             [env var:        │
 │                                                             JOINMARKET_CONF… │
-│ --counterparties   -n                     INTEGER           Number of makers │
-│ --data-dir                                PATH              Data directory   │
+│ --counterparties   -n                     <int>             Number of makers │
+│ --data-dir                                <path>            Data directory   │
 │                                                             (default:        │
 │                                                             ~/.joinmarket-ng │
 │                                                             or               │
 │                                                             $JOINMARKET_DAT… │
 │                                                             [env var:        │
 │                                                             JOINMARKET_DATA… │
-│ --destination      -d                     TEXT              Destination      │
+│ --destination      -d                     <str>             Destination      │
 │                                                             address (or      │
 │                                                             'INTERNAL' for   │
 │                                                             next mixdepth)   │
 │                                                             [default:        │
 │                                                             INTERNAL]        │
-│ --directory        -D                     TEXT              Directory        │
+│ --directory        -D                     <str>             Directory        │
 │                                                             servers          │
 │                                                             (comma-separate… │
 │                                                             [env var:        │
@@ -148,7 +148,7 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
 │                                                             highest realized │
 │                                                             fee in the       │
 │                                                             selected set     │
-│ --fee-rate                                FLOAT             Manual fee rate  │
+│ --fee-rate                                <float>           Manual fee rate  │
 │                                                             in sat/vB.       │
 │                                                             Mutually         │
 │                                                             exclusive with   │
@@ -156,7 +156,7 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
 │ --help                                                      Show this        │
 │                                                             message and      │
 │                                                             exit.            │
-│ --input-utxo                              TEXT              Explicit input   │
+│ --input-utxo                              <str>             Explicit input   │
 │                                                             UTXO as          │
 │                                                             txid:vout        │
 │                                                             (repeatable).    │
@@ -174,12 +174,12 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
 │                                                             Mutually         │
 │                                                             exclusive with   │
 │                                                             --select-utxos.  │
-│ --log-level        -l                     TEXT              Log level        │
-│ --max-abs-fee                             INTEGER           Max absolute fee │
+│ --log-level        -l                     <str>             Log level        │
+│ --max-abs-fee                             <int>             Max absolute fee │
 │                                                             in sats          │
-│ --max-rel-fee                             TEXT              Max relative fee │
+│ --max-rel-fee                             <str>             Max relative fee │
 │                                                             (0.001=0.1%)     │
-│ --mixdepth         -m                     INTEGER           Source mixdepth  │
+│ --mixdepth         -m                     <int>             Source mixdepth  │
 │                                                             (default 0; with │
 │                                                             --select-utxos,  │
 │                                                             derived from the │
@@ -189,11 +189,11 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
 │                                                             entries must     │
 │                                                             belong to this   │
 │                                                             mixdepth)        │
-│ --mnemonic-file    -f                     PATH              Path to mnemonic │
+│ --mnemonic-file    -f                     <path>            Path to mnemonic │
 │                                                             file             │
-│ --network                                 [mainnet|testnet  Protocol network │
-│                                           |signet|regtest]  for handshakes   │
-│ --neutrino-url                            TEXT              Neutrino REST    │
+│ --network                                 <mainnet|testnet  Protocol network │
+│                                           |signet|regtest>  for handshakes   │
+│ --neutrino-url                            <str>             Neutrino REST    │
 │                                                             API URL          │
 │                                                             [env var:        │
 │                                                             NEUTRINO_URL]    │
@@ -210,17 +210,17 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
 │                                                             maker fees up to │
 │                                                             public fee       │
 │                                                             quanta           │
-│ --rpc-url                                 TEXT              Bitcoin full     │
+│ --rpc-url                                 <str>             Bitcoin full     │
 │                                                             node RPC URL     │
 │                                                             [env var:        │
 │                                                             BITCOIN_RPC_URL] │
 │ --select-utxos     -s                                       Interactively    │
 │                                                             select UTXOs     │
 │                                                             (fzf-like TUI)   │
-│ --tor-socks-host                          TEXT              Tor SOCKS proxy  │
+│ --tor-socks-host                          <str>             Tor SOCKS proxy  │
 │                                                             host (overrides  │
 │                                                             TOR__SOCKS_HOST) │
-│ --tor-socks-port                          INTEGER           Tor SOCKS proxy  │
+│ --tor-socks-port                          <int>             Tor SOCKS proxy  │
 │                                                             port (overrides  │
 │                                                             TOR__SOCKS_PORT) │
 │ --yes              -y                                       Skip             │
@@ -241,12 +241,12 @@ For full documentation, see [taker Documentation](https://joinmarket-ng.github.i
  Initialize the config file with default settings.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file          PATH  Config file path (decoupled from data dir).     │
-│                              Defaults to <data-dir>/config.toml              │
-│                              [env var: JOINMARKET_CONFIG_FILE]               │
-│ --data-dir     -d      PATH  Data directory for JoinMarket files             │
-│                              [env var: JOINMARKET_DATA_DIR]                  │
-│ --help                       Show this message and exit.                     │
+│ --config-file          <path>  Config file path (decoupled from data dir).   │
+│                                Defaults to <data-dir>/config.toml            │
+│                                [env var: JOINMARKET_CONFIG_FILE]             │
+│ --data-dir     -d      <path>  Data directory for JoinMarket files           │
+│                                [env var: JOINMARKET_DATA_DIR]                │
+│ --help                         Show this message and exit.                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 

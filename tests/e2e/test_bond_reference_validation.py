@@ -7,11 +7,9 @@ This test will run in the e2e environment where both implementations are availab
 import base64
 import struct
 
-from bitcointx.core.key import CKey
 import pytest
-
+from bitcointx.core.key import CKey
 from jmcore.crypto import bitcoin_message_hash_bytes
-
 
 pytestmark = pytest.mark.reference
 
@@ -86,8 +84,8 @@ def test_bond_proof_validates_with_reference_implementation():
     """
     # Import reference implementation
     try:
-        import sys
         import os
+        import sys
 
         ref_path = os.path.join(
             os.path.dirname(__file__), "../../joinmarket-clientserver/src"
@@ -208,8 +206,8 @@ def test_bond_proof_with_ascii_certificate_validates_with_reference():
     so ASCII-signed certificates should validate.
     """
     try:
-        import sys
         import os
+        import sys
 
         ref_path = os.path.join(
             os.path.dirname(__file__), "../../joinmarket-clientserver/src"
@@ -290,8 +288,8 @@ def test_bond_proof_with_binary_certificate_validates_with_reference():
         b'fidelity-bond-cert|<raw_pubkey_bytes>|<expiry>'
     """
     try:
-        import sys
         import os
+        import sys
 
         ref_path = os.path.join(
             os.path.dirname(__file__), "../../joinmarket-clientserver/src"

@@ -221,12 +221,12 @@ synchronization and address-history verification.
  Initialize the config file with default settings.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file          PATH  Config file path (decoupled from data dir).     │
-│                              Defaults to <data-dir>/config.toml              │
-│                              [env var: JOINMARKET_CONFIG_FILE]               │
-│ --data-dir     -d      PATH  Data directory for JoinMarket files             │
-│                              [env var: JOINMARKET_DATA_DIR]                  │
-│ --help                       Show this message and exit.                     │
+│ --config-file          <path>  Config file path (decoupled from data dir).   │
+│                                Defaults to <data-dir>/config.toml            │
+│                                [env var: JOINMARKET_CONFIG_FILE]             │
+│ --data-dir     -d      <path>  Data directory for JoinMarket files           │
+│                                [env var: JOINMARKET_DATA_DIR]                │
+│ --help                         Show this message and exit.                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -247,36 +247,36 @@ synchronization and address-history verification.
  priority.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend-type                  TEXT                  Backend type:          │
+│ --backend-type                  <str>                 Backend type:          │
 │                                                       descriptor_wallet |    │
 │                                                       neutrino               │
-│ --bitcoin-network               [mainnet|testnet|sig  Bitcoin network for    │
-│                                 net|regtest]          address generation     │
+│ --bitcoin-network               <mainnet|testnet|sig  Bitcoin network for    │
+│                                 net|regtest>          address generation     │
 │                                                       (defaults to           │
 │                                                       --network)             │
-│ --cj-fee-absolute               INTEGER               Absolute coinjoin fee  │
+│ --cj-fee-absolute               <int>                 Absolute coinjoin fee  │
 │                                                       in sats. Mutually      │
 │                                                       exclusive with         │
 │                                                       --cj-fee-relative.     │
 │                                                       [env var:              │
 │                                                       CJ_FEE_ABSOLUTE]       │
-│ --cj-fee-relative               TEXT                  Relative coinjoin fee  │
+│ --cj-fee-relative               <str>                 Relative coinjoin fee  │
 │                                                       (e.g., 0.001 = 0.1%)   │
 │                                                       [env var:              │
 │                                                       CJ_FEE_RELATIVE]       │
-│ --config-file                   PATH                  Config file path       │
+│ --config-file                   <path>                Config file path       │
 │                                                       (decoupled from data   │
 │                                                       dir). Defaults to      │
 │                                                       <data-dir>/config.toml │
 │                                                       [env var:              │
 │                                                       JOINMARKET_CONFIG_FIL… │
-│ --data-dir              -d      PATH                  Data directory for     │
+│ --data-dir              -d      <path>                Data directory for     │
 │                                                       JoinMarket files.      │
 │                                                       Defaults to            │
 │                                                       ~/.joinmarket-ng       │
 │                                                       [env var:              │
 │                                                       JOINMARKET_DATA_DIR]   │
-│ --directory             -D      TEXT                  Directory servers      │
+│ --directory             -D      <str>                 Directory servers      │
 │                                                       (comma-separated       │
 │                                                       host:port)             │
 │                                                       [env var:              │
@@ -293,27 +293,27 @@ synchronization and address-history verification.
 │                                                       --cj-fee-relative and  │
 │                                                       --cj-fee-absolute to   │
 │                                                       set fees for each.     │
-│ --fidelity-bond         -B      TEXT                  Specific fidelity bond │
+│ --fidelity-bond         -B      <str>                 Specific fidelity bond │
 │                                                       to use (format:        │
 │                                                       txid:vout)             │
-│ --fidelity-bond-index   -I      INTEGER               Fidelity bond          │
+│ --fidelity-bond-index   -I      <int>                 Fidelity bond          │
 │                                                       derivation index       │
 │                                                       [env var:              │
 │                                                       FIDELITY_BOND_INDEX]   │
-│ --fidelity-bond-lockt…  -L      INTEGER               Fidelity bond          │
+│ --fidelity-bond-lockt…  -L      <int>                 Fidelity bond          │
 │                                                       locktimes to scan for  │
 │ --help                                                Show this message and  │
 │                                                       exit.                  │
-│ --log-level             -l      TEXT                  Log level              │
-│ --merge-algorithm       -M      TEXT                  UTXO selection         │
+│ --log-level             -l      <str>                 Log level              │
+│ --merge-algorithm       -M      <str>                 UTXO selection         │
 │                                                       strategy: default,     │
 │                                                       gradual, greedy,       │
 │                                                       greediest, random      │
 │                                                       [env var:              │
 │                                                       MERGE_ALGORITHM]       │
-│ --min-size                      INTEGER               Minimum CoinJoin size  │
+│ --min-size                      <int>                 Minimum CoinJoin size  │
 │                                                       in sats                │
-│ --mixdepth-selection            TEXT                  Source mixdepth        │
+│ --mixdepth-selection            <str>                 Source mixdepth        │
 │                                                       policy: balanced       │
 │                                                       (privacy compartments) │
 │                                                       or concentrated        │
@@ -321,11 +321,11 @@ synchronization and address-history verification.
 │                                                       heuristic)             │
 │                                                       [env var:              │
 │                                                       MIXDEPTH_SELECTION]    │
-│ --mnemonic-file         -f      PATH                  Path to mnemonic file  │
-│ --network                       [mainnet|testnet|sig  Protocol network       │
-│                                 net|regtest]          (mainnet, testnet,     │
+│ --mnemonic-file         -f      <path>                Path to mnemonic file  │
+│ --network                       <mainnet|testnet|sig  Protocol network       │
+│                                 net|regtest>          (mainnet, testnet,     │
 │                                                       signet, regtest)       │
-│ --neutrino-url                  TEXT                  Neutrino REST API URL  │
+│ --neutrino-url                  <str>                 Neutrino REST API URL  │
 │                                                       [env var:              │
 │                                                       NEUTRINO_URL]          │
 │ --no-fidelity-bond                                    Disable fidelity bond  │
@@ -334,41 +334,48 @@ synchronization and address-history verification.
 │                                                       generation even when   │
 │                                                       bonds exist in the     │
 │                                                       registry.              │
-│ --onion-serving-host            TEXT                  Bind address for       │
+│ --onion-serving-host            <str>                 Bind address for       │
 │                                                       incoming connections   │
 │                                                       (overrides             │
 │                                                       MAKER__ONION_SERVING_… │
-│ --onion-serving-port            INTEGER               Port for incoming      │
+│ --onion-serving-port            <int>                 Port for incoming      │
 │                                                       .onion connections     │
 │                                                       (overrides             │
 │                                                       MAKER__ONION_SERVING_… │
 │ --prompt-bip39-passph…                                Prompt for BIP39       │
 │                                                       passphrase             │
 │                                                       interactively          │
-│ --rpc-url                       TEXT                  Bitcoin full node RPC  │
+│ --rpc-url                       <str>                 Bitcoin full node RPC  │
 │                                                       URL                    │
 │                                                       [env var:              │
 │                                                       BITCOIN_RPC_URL]       │
-│ --tor-control-host              TEXT                  Tor control port host  │
+│ --staged-credentials-…          <path>                Service                │
+│                                                       EnvironmentFile whose  │
+│                                                       wallet binding must    │
+│                                                       validate before        │
+│                                                       startup                │
+│                                                       [env var:              │
+│                                                       JOINMARKET_STAGED_CRE… │
+│ --tor-control-host              <str>                 Tor control port host  │
 │                                                       (overrides             │
 │                                                       TOR__CONTROL_HOST)     │
-│ --tor-control-port              INTEGER               Tor control port       │
+│ --tor-control-port              <int>                 Tor control port       │
 │                                                       (overrides             │
 │                                                       TOR__CONTROL_PORT)     │
-│ --tor-cookie-path               PATH                  Path to Tor cookie     │
+│ --tor-cookie-path               <path>                Path to Tor cookie     │
 │                                                       auth file (overrides   │
 │                                                       TOR__COOKIE_PATH)      │
-│ --tor-socks-host                TEXT                  Tor SOCKS proxy host   │
+│ --tor-socks-host                <str>                 Tor SOCKS proxy host   │
 │                                                       (overrides             │
 │                                                       TOR__SOCKS_HOST)       │
-│ --tor-socks-port                INTEGER               Tor SOCKS proxy port   │
+│ --tor-socks-port                <int>                 Tor SOCKS proxy port   │
 │                                                       (overrides             │
 │                                                       TOR__SOCKS_PORT)       │
-│ --tor-target-host               TEXT                  Target hostname for    │
+│ --tor-target-host               <str>                 Target hostname for    │
 │                                                       Tor hidden service     │
 │                                                       (overrides             │
 │                                                       TOR__TARGET_HOST)      │
-│ --tx-fee-contribution           INTEGER               Tx fee contribution in │
+│ --tx-fee-contribution           <int>                 Tx fee contribution in │
 │                                                       sats                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```

@@ -9,12 +9,11 @@ import shutil
 import stat
 import subprocess
 import textwrap
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SH = REPO_ROOT / "install.sh"

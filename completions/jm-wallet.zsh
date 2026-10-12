@@ -15,6 +15,7 @@ _jm_wallet() {
     'generate-bond-address:Generate a fidelity bond (timelocked P2WSH) address.'
     'generate-hot-keypair:Generate a hot wallet keypair for fidelity bond certificates.'
     'history:View CoinJoin transaction history.'
+    'identity:Remember public wallet identities, never passphrases.'
     'import:Import an existing BIP39 mnemonic phrase to create/recover a wallet.'
     'import-bond:Manually import a fidelity bond into the registry.'
     'import-bond-registration:Import a verified SeedSigner BIP46 fidelity-bond registration payload.'
@@ -121,6 +122,7 @@ _jm_wallet() {
             '--output=[Output file path]:file:_files' \
             '--prompt-password[Prompt for password interactively (default\: prompt)]' \
             '--force[Overwrite existing file without confirmation]' \
+            '--register-identity[Confirm and select a derived wallet identity (default\: follow BIP39 setting)]' \
             '--data-dir=[Data directory (default\: ~/.joinmarket-ng or $JOINMARKET_DATA_DIR). When --output is not given, the wallet is saved under <data-dir>/wallets/default.mnemonic.]:file:_files' \
             '--help[Show this message and exit]'
           ;;
@@ -160,12 +162,17 @@ _jm_wallet() {
             '--log-level=[Log level]: :' \
             '--help[Show this message and exit]'
           ;;
+        identity)
+          _arguments \
+            '--help[Show this message and exit]'
+          ;;
         import)
           _arguments \
             '--words=[Number of words (12, 15, 18, 21, or 24)]: :' \
             '--output=[Output file path]:file:_files' \
             '--prompt-password[Prompt for password interactively (default\: prompt)]' \
             '--force[Overwrite existing file without confirmation]' \
+            '--register-identity[Confirm and select a derived wallet identity (default\: follow BIP39 setting)]' \
             '--data-dir=[Data directory (default\: ~/.joinmarket-ng or $JOINMARKET_DATA_DIR). When --output is not given, the wallet is saved under <data-dir>/wallets/default.mnemonic.]:file:_files' \
             '--help[Show this message and exit]'
           ;;

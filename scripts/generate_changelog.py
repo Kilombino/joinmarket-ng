@@ -140,10 +140,8 @@ def generate_changelog_section(
 
         if require_trailers and not commit.changelog_entries:
             errors.append(
-                (
-                    f"commit {commit.hash} ({commit.type}) is missing required "
-                    "'Changelog: ...' trailer"
-                )
+                f"commit {commit.hash} ({commit.type}) is missing required "
+                "'Changelog: ...' trailer"
             )
             continue
 

@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from sign_bond_psbt import (  # noqa: E402
+from sign_bond_psbt import (
     enumerate_devices,
     is_stable_package_release,
     jade_cbor2_error,

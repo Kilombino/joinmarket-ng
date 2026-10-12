@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 
-
 USER_AGENT = "joinmarket-ng-dependency-updater/1.0"
 JAM_REPO_URL = "https://github.com/joinmarket-webui/jam.git"
 JAM_DOCKER_REPO_URL = "https://github.com/joinmarket-webui/jam-docker.git"

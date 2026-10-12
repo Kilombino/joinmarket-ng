@@ -11,7 +11,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).parent.parent
 CHANGELOG = PROJECT_ROOT / "CHANGELOG.md"
 CONFIG_HEADING = "### Configuration Changes"

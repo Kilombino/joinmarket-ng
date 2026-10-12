@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import NamedTuple
 from urllib.request import Request, urlopen
 
-
 REPOSITORY = "m0wer/python-bitcointx"
 RELEASE_API_URL = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
 USER_AGENT = "joinmarket-ng-dependency-updater/1.0"

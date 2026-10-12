@@ -6,9 +6,9 @@ import json
 
 
 async def test_direct_orderbook():
+    from jmcore.crypto import NickIdentity
     from jmcore.network import TCPConnection
     from jmcore.protocol import MessageType
-    from jmcore.crypto import NickIdentity
 
     print("Connecting to maker on localhost:5000...")
 
@@ -71,7 +71,7 @@ async def test_direct_orderbook():
         else:
             print("\nUnexpected response content")
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("\n>>> FAILURE: Timeout waiting for response <<<")
 
     await conn.close()

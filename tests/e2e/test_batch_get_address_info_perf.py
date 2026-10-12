@@ -35,7 +35,6 @@ from typing import Any
 
 import httpx
 import pytest
-
 from jmwallet.backends.descriptor_wallet import DescriptorWalletBackend
 
 pytestmark = pytest.mark.e2e

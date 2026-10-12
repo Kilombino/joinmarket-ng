@@ -177,6 +177,7 @@ def test_our_orderbook_watcher_receives_reference_maker_bonds(
         return
 
     import asyncio
+
     import httpx
 
     async def check_orderbook():

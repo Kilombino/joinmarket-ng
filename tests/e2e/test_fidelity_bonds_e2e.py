@@ -139,7 +139,7 @@ async def test_new_peer_triggers_orderbook_request(wait_for_directory_server):
         watcher.stop()
         try:
             await asyncio.wait_for(listen_task, timeout=2.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         await watcher.close()
 
@@ -201,6 +201,6 @@ async def test_bond_appears_in_privmsg_not_public(wait_for_directory_server):
         watcher.stop()
         try:
             await asyncio.wait_for(listen_task, timeout=2.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         await watcher.close()

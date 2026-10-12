@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMPLETIONS_DIR = REPO_ROOT / "completions"
 LOADER = COMPLETIONS_DIR / "jm-completions-loader.sh"

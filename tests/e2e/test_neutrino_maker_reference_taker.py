@@ -35,7 +35,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from loguru import logger
@@ -524,7 +524,7 @@ async def test_neutrino_maker_logs_incompatibility(
             cleanup_wallet_lock(wallet_name)
 
             # Snapshot time just before this CoinJoin so we can scope log checks
-            round_start = datetime.now(tz=timezone.utc)
+            round_start = datetime.now(tz=UTC)
 
             result = _run_coinjoin(
                 compose_file,

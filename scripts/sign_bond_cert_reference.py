@@ -374,7 +374,7 @@ workflow:
     # derivation values and copies inside C extensions are also beyond our
     # control. Better than nothing, but not a bulletproof guarantee -- we do
     # our part.
-    mnemonic = "x" * len(mnemonic)  # noqa: F841
+    mnemonic = "x" * len(mnemonic)
     del mnemonic
 
     print(f"Bond pubkey:     {pubkey_bytes.hex()}", file=sys.stderr)

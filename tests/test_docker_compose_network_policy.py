@@ -5,7 +5,6 @@ from pathlib import Path
 
 import yaml
 
-
 COMPOSE_FILE = Path(__file__).resolve().parents[1] / "docker-compose.yml"
 LOCAL_DIRECTORY_CLIENTS = {
     "orderbook-watcher",

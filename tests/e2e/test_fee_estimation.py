@@ -19,7 +19,6 @@ from jmwallet.backends.descriptor_wallet import DescriptorWalletBackend
 from jmwallet.backends.neutrino import NeutrinoBackend
 from loguru import logger
 
-
 # ==============================================================================
 # Fixtures
 # ==============================================================================

@@ -17,9 +17,9 @@ import socket
 import ssl
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.request
-import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING

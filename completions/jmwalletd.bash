@@ -7,7 +7,7 @@ _jmwalletd_completion() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    COMPREPLY=( $(compgen -W "--help --host --port --ws-port --data-dir --config-file --no-tls" -- "$cur") )
+    COMPREPLY=( $(compgen -W "--help --host --port --ws-port --data-dir --config-file --no-tls --version" -- "$cur") )
     return 0
 }
 

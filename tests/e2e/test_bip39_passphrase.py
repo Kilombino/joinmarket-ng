@@ -17,7 +17,6 @@ Usage:
 from __future__ import annotations
 
 import pytest
-
 from jmcore.timenumber import parse_locktime_date, timenumber_to_timestamp
 from loguru import logger
 
@@ -175,9 +174,9 @@ class TestBIP39PassphraseWallet:
         4. Create a NEW wallet instance with same mnemonic+passphrase
         5. Verify the bond is discovered during recovery scan
         """
-        from tests.e2e.rpc_utils import mine_blocks, rpc_call, send_from_test_funder
-
         from jmwallet.wallet.service import WalletService
+
+        from tests.e2e.rpc_utils import mine_blocks, rpc_call, send_from_test_funder
 
         # Use a past locktime so the bond is spendable (for cleanup)
         # Timenumber 0 = January 2020

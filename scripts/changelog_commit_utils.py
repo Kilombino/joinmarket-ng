@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-
+from dataclasses import dataclass
 
 CONVENTIONAL_COMMIT_PATTERN = re.compile(
     r"^(?P<type>[a-z]+)"

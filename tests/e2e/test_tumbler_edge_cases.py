@@ -27,6 +27,7 @@ from typing import Any
 import httpx
 import pytest
 
+from tests.e2e.rpc_utils import rpc_call
 from tests.e2e.test_tumbler_e2e import (
     API,
     FUND_AMOUNT_BTC,
@@ -46,7 +47,6 @@ from tests.e2e.test_tumbler_e2e import (
     _wait_for_jmwalletd,
     _wait_for_sync_and_funds,
 )
-from tests.e2e.rpc_utils import rpc_call
 
 pytestmark = [pytest.mark.e2e, pytest.mark.tumbler_e2e]
 

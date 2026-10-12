@@ -14,8 +14,8 @@ from loguru import logger
 
 from tests.e2e.docker_utils import (
     get_compose_file,  # noqa: F401 – re-exported for existing callers
-    run_compose_cmd,  # noqa: F401 – re-exported for existing callers
-    run_container_cmd,  # noqa: F401 – re-exported for existing callers
+    run_compose_cmd,
+    run_container_cmd,
 )
 
 

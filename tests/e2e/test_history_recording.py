@@ -144,7 +144,6 @@ async def test_coinjoin_creates_history_entry(
     from jmcore.models import NetworkType
     from taker.config import TakerConfig
     from taker.taker import Taker
-    from tests.e2e.rpc_utils import mine_blocks, rpc_call
 
     # Check if Docker makers are running
     from tests.e2e.docker_utils import (
@@ -152,6 +151,7 @@ async def test_coinjoin_creates_history_entry(
         get_container_name,
         run_compose_cmd,
     )
+    from tests.e2e.rpc_utils import mine_blocks, rpc_call
 
     maker1_container = get_container_name("maker1")
     if not docker_inspect_running(maker1_container):

@@ -24,6 +24,7 @@ Before this extension, a dataclass like:
 @dataclass
 class ResolvedBackendSettings:
     """Resolved backend settings ready for use."""
+
     network: str
     bitcoin_network: str
     backend_type: str
@@ -56,6 +57,7 @@ The extension is located at `docs/_extensions/hide_dataclass_init.py`:
 
 ```python
 import griffe
+
 
 class HideDataclassInit(griffe.Extension):
     """Remove auto-generated __init__ from dataclass documentation."""
@@ -108,6 +110,7 @@ This check ensures we only remove **auto-generated** `__init__` methods. If a de
 @dataclass
 class MyConfig:
     """Configuration class."""
+
     value: int
 
     def __init__(self, value: int):

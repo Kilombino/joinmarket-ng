@@ -13,8 +13,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from jmcore import directory_client, network
 from jmcore.crypto import NickIdentity
 from jmcore.directory_client import PeerlistSnapshot
 from jmcore.models import Offer, OfferType
@@ -29,12 +27,13 @@ from jmcore.nick_auth import (
 from jmcore.protocol import (
     FEATURE_NICK_AUTH,
     FEATURE_PEERLIST_FEATURES,
-    FeatureSet,
     JM_VERSION,
+    FeatureSet,
     MessageType,
 )
-from scripts import diagnose_maker as tool
 
+from jmcore import directory_client, network
+from scripts import diagnose_maker as tool
 
 DIRECTORY_HOST = "a" * 56 + ".onion"
 DIRECTORY_PORT = 17777

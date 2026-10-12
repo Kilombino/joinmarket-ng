@@ -137,10 +137,10 @@ async def establish_single_connection(
                             "line", ""
                         ) or "sw0absoffer" in msg.get("line", ""):
                             stats.orderbook_responses += 1
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass  # Rate limited
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
 
         await conn.close()
@@ -152,7 +152,7 @@ async def establish_single_connection(
                 f"(total: {stats.successful_connections} success, {stats.failed_connections} failed)"
             )
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         stats.failed_connections += 1
         elapsed = time.time() - connect_start
         if stats.failed_connections % 5 == 1:

@@ -34,8 +34,6 @@ from pathlib import Path
 import pytest
 from jmcore.cli_common import ResolvedBackendSettings
 from jmcore.timenumber import get_nearest_valid_locktime, timestamp_to_timenumber
-from loguru import logger
-
 from jmwallet.backends.descriptor_wallet import DescriptorWalletBackend
 from jmwallet.cli.bonds import _list_bonds_offline, _sync_bonds_async
 from jmwallet.cli.mnemonic import generate_mnemonic_secure
@@ -47,6 +45,7 @@ from jmwallet.wallet.bond_registry import (
 from jmwallet.wallet.constants import FIDELITY_BOND_BRANCH
 from jmwallet.wallet.service import WalletService
 from jmwallet.wallet.spend import direct_send
+from loguru import logger
 
 # Mark all tests in this module as requiring Docker e2e profile
 pytestmark = pytest.mark.e2e

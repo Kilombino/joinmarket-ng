@@ -109,13 +109,32 @@ def get_compose_cmd_prefix() -> list[str]:
     return cmd
 
 
+def _run_unchecked(
+    cmd: list[str], timeout: float | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run *cmd* without raising when the ``docker`` binary is missing.
+
+    Module-level ``skipif`` markers probe compose services at import time.
+    Without Docker installed, a raw ``FileNotFoundError`` would turn those
+    probes into collection errors instead of a clean skip/deselect.
+    """
+    try:
+        return subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except FileNotFoundError as exc:
+        return subprocess.CompletedProcess(cmd, 127, "", str(exc))
+
+
 def run_compose_cmd(
     args: list[str], check: bool = True
 ) -> subprocess.CompletedProcess[str]:
     """Run a ``docker compose`` command with project isolation support."""
     cmd = get_compose_cmd_prefix() + args
     logger.debug(f"Running: {' '.join(cmd)}")
-    return subprocess.run(cmd, capture_output=True, text=True, check=check)
+    if not check:
+        return _run_unchecked(cmd)
+    return subprocess.run(cmd, capture_output=True, text=True, check=True)
 
 
 def run_container_cmd(
@@ -124,9 +143,7 @@ def run_container_cmd(
     """Run a command inside a compose *service* via ``docker compose exec``."""
     cmd = get_compose_cmd_prefix() + ["exec", "-T", service] + args
     logger.debug(f"Running in {service}: {' '.join(args)}")
-    return subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout, check=False
-    )
+    return _run_unchecked(cmd, timeout=timeout)
 
 
 def docker_inspect_running(container: str) -> bool:

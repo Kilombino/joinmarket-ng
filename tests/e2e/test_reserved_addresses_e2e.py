@@ -20,7 +20,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-
 from jmwallet.backends.descriptor_wallet import (
     DescriptorWalletBackend,
     generate_wallet_name,

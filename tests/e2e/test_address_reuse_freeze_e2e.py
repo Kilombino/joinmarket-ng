@@ -22,8 +22,6 @@ from typing import Any
 import httpx
 import pytest
 import pytest_asyncio
-from loguru import logger
-
 from jmwallet.backends.descriptor_wallet import (
     DescriptorWalletBackend,
     generate_wallet_name,
@@ -33,6 +31,7 @@ from jmwallet.cli.mnemonic import generate_mnemonic_secure
 from jmwallet.wallet.service import WalletService
 from jmwallet.wallet.spend import direct_send
 from jmwallet.wallet.utxo_metadata import AUTO_FREEZE_REUSE_LABEL
+from loguru import logger
 
 pytestmark = pytest.mark.e2e
 

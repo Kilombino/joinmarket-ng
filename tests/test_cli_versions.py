@@ -10,10 +10,9 @@ from unittest.mock import Mock
 
 import pytest
 from click import unstyle
+from jmcore.version import get_version
 from typer import rich_utils
 from typer.testing import CliRunner
-
-from jmcore.version import get_version
 
 
 @pytest.mark.parametrize(

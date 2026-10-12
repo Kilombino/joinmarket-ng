@@ -32,7 +32,6 @@ from typing import Any
 import httpx
 import pytest
 import pytest_asyncio
-
 from jmwallet.backends.descriptor_wallet import (
     DescriptorWalletBackend,
     generate_wallet_name,

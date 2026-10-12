@@ -8,7 +8,6 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 TEST_FINGERPRINT = "111122223333444455556666777788889999AAAA"

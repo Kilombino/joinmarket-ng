@@ -8,7 +8,6 @@ from typing import Any
 import yaml
 from packaging.version import Version
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 IMAGES = {

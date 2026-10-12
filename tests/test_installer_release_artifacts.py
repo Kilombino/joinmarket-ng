@@ -6,7 +6,6 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SIGN_RELEASE_SCRIPT = REPO_ROOT / "scripts" / "sign-release.sh"
 TEST_FINGERPRINT = "111122223333444455556666777788889999AAAA"

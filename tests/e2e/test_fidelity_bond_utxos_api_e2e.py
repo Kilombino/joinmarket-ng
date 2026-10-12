@@ -167,6 +167,7 @@ async def test_recover_wallet_discovers_preexisting_fidelity_bond(
     """Mnemonic recovery imports the complete bond branch before rescanning."""
     from jmcore.timenumber import timestamp_to_timenumber
     from jmwallet.wallet.service import WalletService
+
     from tests.e2e.rpc_utils import mine_blocks, send_from_test_funder
 
     await _wait_for_jmwalletd()

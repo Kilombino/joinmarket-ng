@@ -123,7 +123,7 @@ async def test_external_deposit_produces_ws_notification(
                     remaining = deadline - asyncio.get_event_loop().time()
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
-                    except (TimeoutError, asyncio.TimeoutError):
+                    except TimeoutError:
                         break
                     try:
                         frame = json.loads(raw)

@@ -4,9 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import yaml
-
 from jmcore.fee_quantization import QUANT_REL
-
 
 COMPOSE_FILE = Path(__file__).resolve().parents[1] / "docker-compose.yml"
 E2E_MAKER_SERVICES = ("maker1", "maker2", "maker3", "maker4", "maker5")

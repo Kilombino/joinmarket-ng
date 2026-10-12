@@ -17,7 +17,7 @@ class _StubSocket:
     def __enter__(self) -> _StubSocket:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.closed = True
 
 

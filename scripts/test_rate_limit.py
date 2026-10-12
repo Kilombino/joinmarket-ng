@@ -107,7 +107,7 @@ async def test_rate_limiting(
                         print(
                             f"\n[{time.time() - start_time:.1f}s] Rate limited: {line[:80]}"
                         )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # No response (rate limited silently)
             except Exception as e:
                 if "closed" in str(e).lower():

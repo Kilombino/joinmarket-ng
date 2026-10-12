@@ -42,7 +42,6 @@ from typing import Any
 
 import httpx
 import pytest
-
 from jmwallet.backends.descriptor_wallet import DescriptorWalletBackend
 
 from tests.e2e.docker_utils import run_compose_cmd

@@ -65,7 +65,7 @@ async def extract_onion_from_directory(
                 msg = json.loads(data.decode())
                 if msg.get("type") == MessageType.HANDSHAKE.value:
                     break
-        except asyncio.TimeoutError:
+        except TimeoutError:
             continue
 
     # Request peerlist
@@ -103,7 +103,7 @@ async def extract_onion_from_directory(
                             continue
                 timeout_count = 0
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timeout_count += 1
             if maker_location:
                 break
@@ -172,7 +172,7 @@ async def test_direct_orderbook(onion_address: str, port: int) -> None:
         else:
             print("Empty handshake response")
             return
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("Handshake timeout!")
         return
 
@@ -218,7 +218,7 @@ async def test_direct_orderbook(onion_address: str, port: int) -> None:
                 # Reset timeout counter on valid response
                 timeout_count = 0
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timeout_count += 1
             print(f"  (timeout {timeout_count}/{max_timeouts})")
 

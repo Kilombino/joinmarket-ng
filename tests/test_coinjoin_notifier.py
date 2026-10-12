@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
-from email.message import Message
 import importlib.util
 import json
 import logging
+from contextlib import nullcontext
+from email.message import Message
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch

@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 JMWALLETD_DOCKERFILE = REPO_ROOT / "jmwalletd" / "Dockerfile"
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
@@ -26,7 +25,7 @@ RELEASE_SCRIPTS = (
     REPO_ROOT / "scripts" / "verify-release.sh",
 )
 STANDALONE_NG_IMAGE = "ghcr.io/joinmarket-webui/jam-dev-standalone-ng:master"
-JAM_DOCKER_COMMIT = "d63987e57e9ca34ad73c99f79011f055e8613fbb"
+JAM_DOCKER_COMMIT = "3e4e97105f4c2f49f8da66067fcec8660927c2f5"
 STANDALONE_NG_CONTEXT = f"https://github.com/joinmarket-webui/jam-docker.git#{JAM_DOCKER_COMMIT}:standalone-ng"
 JAM_REPO_REF = "v2.0.0-beta.4"
 

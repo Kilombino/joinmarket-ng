@@ -62,12 +62,12 @@ pytest tumbler/tests
  Initialize the config file with default settings.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file          PATH  Config file path (decoupled from data dir).     │
-│                              Defaults to <data-dir>/config.toml              │
-│                              [env var: JOINMARKET_CONFIG_FILE]               │
-│ --data-dir     -d      PATH  Data directory for JoinMarket files             │
-│                              [env var: JOINMARKET_DATA_DIR]                  │
-│ --help                       Show this message and exit.                     │
+│ --config-file          <path>  Config file path (decoupled from data dir).   │
+│                                Defaults to <data-dir>/config.toml            │
+│                                [env var: JOINMARKET_CONFIG_FILE]             │
+│ --data-dir     -d      <path>  Data directory for JoinMarket files           │
+│                                [env var: JOINMARKET_DATA_DIR]                │
+│ --help                         Show this message and exit.                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -83,22 +83,22 @@ pytest tumbler/tests
  Delete the on-disk plan for ``wallet_name``.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                      PATH  Config file path (decoupled from    │
-│                                          data dir). Defaults to              │
-│                                          <data-dir>/config.toml              │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --help                                   Show this message and exit.         │
-│ --log-level                -l      TEXT                                      │
-│ --mnemonic-file            -f      PATH  Path to mnemonic file               │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│                                          interactively                       │
-│ --wallet-name              -w      TEXT  Wallet identifier; defaults to the  │
-│                                          mnemonic fingerprint                │
-│ --yes                      -y            Skip confirmation prompt            │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>                                     │
+│ --mnemonic-file            -f      <path>  Path to mnemonic file             │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│                                            interactively                     │
+│ --wallet-name              -w      <str>   Wallet identifier; defaults to    │
+│                                            the mnemonic fingerprint          │
+│ --yes                      -y              Skip confirmation prompt          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -128,24 +128,24 @@ pytest tumbler/tests
 │                                                             pairwise         │
 │                                                             re-aggregation   │
 │                                                             heuristics.      │
-│    --backend        -b                     TEXT             Backend type:    │
+│    --backend        -b                     <str>            Backend type:    │
 │                                                             descriptor_wall… │
 │                                                             | neutrino       │
-│    --config-file                           PATH             Config file path │
+│    --config-file                           <path>           Config file path │
 │                                                             (decoupled from  │
 │                                                             data dir).       │
 │                                                             Defaults to      │
 │                                                             <data-dir>/conf… │
 │                                                             [env var:        │
 │                                                             JOINMARKET_CONF… │
-│    --data-dir                              PATH             Data directory   │
+│    --data-dir                              <path>           Data directory   │
 │                                                             (default:        │
 │                                                             ~/.joinmarket-ng │
 │                                                             or               │
 │                                                             $JOINMARKET_DAT… │
 │                                                             [env var:        │
 │                                                             JOINMARKET_DATA… │
-│ *  --destination    -d                     TEXT             External         │
+│ *  --destination    -d                     <str>            External         │
 │                                                             destination      │
 │                                                             address          │
 │                                                             (repeatable)     │
@@ -156,44 +156,44 @@ pytest tumbler/tests
 │    --help                                                   Show this        │
 │                                                             message and      │
 │                                                             exit.            │
-│    --log-level      -l                     TEXT                              │
-│    --maker-count-…                         INTEGER          Maximum          │
+│    --log-level      -l                     <str>                             │
+│    --maker-count-…                         <int>            Maximum          │
 │                                                             counterparty     │
 │                                                             count per CJ;    │
 │                                                             defaults to      │
 │                                                             settings.taker.… │
-│    --maker-count-…                         INTEGER          Minimum          │
+│    --maker-count-…                         <int>            Minimum          │
 │                                                             counterparty     │
 │                                                             count per CJ;    │
 │                                                             defaults to      │
 │                                                             settings.taker.… │
 │    --maker-sessio…      --no-maker-ses…                     [default:        │
 │                                                             maker-sessions]  │
-│    --mincjamount-…                         INTEGER          Minimum CJ       │
+│    --mincjamount-…                         <int>            Minimum CJ       │
 │                                                             amount in sats   │
 │                                                             [default:        │
 │                                                             100000]          │
-│    --mnemonic-file  -f                     PATH             Path to mnemonic │
+│    --mnemonic-file  -f                     <path>           Path to mnemonic │
 │                                                             file             │
-│    --network                               [mainnet|testne  Bitcoin network  │
+│    --network                               <mainnet|testne  Bitcoin network  │
 │                                            t|signet|regtes                   │
-│                                            t]                                │
-│    --neutrino-url                          TEXT             Neutrino REST    │
+│                                            t>                                │
+│    --neutrino-url                          <str>            Neutrino REST    │
 │                                                             API URL          │
 │                                                             [env var:        │
 │                                                             NEUTRINO_URL]    │
 │    --prompt-bip39…                                          Prompt for BIP39 │
 │                                                             passphrase       │
 │                                                             interactively    │
-│    --rpc-url                               TEXT             Bitcoin full     │
+│    --rpc-url                               <str>            Bitcoin full     │
 │                                                             node RPC URL     │
 │                                                             [env var:        │
 │                                                             BITCOIN_RPC_URL] │
-│    --seed                                  INTEGER          Seed the plan    │
+│    --seed                                  <int>            Seed the plan    │
 │                                                             builder RNG for  │
 │                                                             reproducible     │
 │                                                             schedules        │
-│    --wallet-name    -w                     TEXT             Wallet           │
+│    --wallet-name    -w                     <str>            Wallet           │
 │                                                             identifier for   │
 │                                                             the plan file;   │
 │                                                             defaults to the  │
@@ -214,35 +214,35 @@ pytest tumbler/tests
  Execute the saved plan for a wallet to completion.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend               -b      TEXT                                         │
-│ --block-target                  INTEGER               Target blocks for fee  │
+│ --backend               -b      <str>                                        │
+│ --block-target                  <int>                 Target blocks for fee  │
 │                                                       estimation (mutually   │
 │                                                       exclusive with         │
 │                                                       --fee-rate). Not       │
 │                                                       supported with the     │
 │                                                       neutrino backend.      │
-│ --config-file                   PATH                  Config file path       │
+│ --config-file                   <path>                Config file path       │
 │                                                       (decoupled from data   │
 │                                                       dir). Defaults to      │
 │                                                       <data-dir>/config.toml │
 │                                                       [env var:              │
 │                                                       JOINMARKET_CONFIG_FIL… │
-│ --counterparties                INTEGER RANGE         Override the           │
+│ --counterparties                <int range>           Override the           │
 │                                 [1<=x<=20]            counterparty count for │
 │                                                       every phase at         │
 │                                                       runtime. Useful when   │
 │                                                       the configured count   │
 │                                                       is unavailable on the  │
 │                                                       chosen network.        │
-│ --data-dir                      PATH                  Data directory         │
+│ --data-dir                      <path>                Data directory         │
 │                                                       (default:              │
 │                                                       ~/.joinmarket-ng or    │
 │                                                       $JOINMARKET_DATA_DIR)  │
 │                                                       [env var:              │
 │                                                       JOINMARKET_DATA_DIR]   │
-│ --directory             -D      TEXT                  [env var:              │
+│ --directory             -D      <str>                 [env var:              │
 │                                                       DIRECTORY_SERVERS]     │
-│ --fee-rate                      FLOAT                 Manual fee rate in     │
+│ --fee-rate                      <float>               Manual fee rate in     │
 │                                                       sat/vB (mutually       │
 │                                                       exclusive with         │
 │                                                       --block-target).       │
@@ -250,18 +250,18 @@ pytest tumbler/tests
 │                                                       backend is neutrino.   │
 │ --help                                                Show this message and  │
 │                                                       exit.                  │
-│ --log-level             -l      TEXT                                         │
-│ --min-confirmations             INTEGER               Confirmations required │
+│ --log-level             -l      <str>                                        │
+│ --min-confirmations             <int>                 Confirmations required │
 │                                                       before the next phase  │
 │                                                       starts (0 disables     │
 │                                                       gating). Defaults to   │
 │                                                       the                    │
 │                                                       tumbler.min_confirmat… │
 │                                                       setting (6).           │
-│ --mnemonic-file         -f      PATH                  Path to mnemonic file  │
-│ --network                       [mainnet|testnet|sig                         │
-│                                 net|regtest]                                 │
-│ --neutrino-url                  TEXT                  [env var:              │
+│ --mnemonic-file         -f      <path>                Path to mnemonic file  │
+│ --network                       <mainnet|testnet|sig                         │
+│                                 net|regtest>                                 │
+│ --neutrino-url                  <str>                 [env var:              │
 │                                                       NEUTRINO_URL]          │
 │ --prompt-bip39-passph…                                Prompt for BIP39       │
 │                                                       passphrase             │
@@ -280,13 +280,13 @@ pytest tumbler/tests
 │                                                       Has no effect on a     │
 │                                                       plan that is already   │
 │                                                       PENDING.               │
-│ --rpc-url                       TEXT                  [env var:              │
+│ --rpc-url                       <str>                 [env var:              │
 │                                                       BITCOIN_RPC_URL]       │
-│ --tor-socks-host                TEXT                  Tor SOCKS host         │
+│ --tor-socks-host                <str>                 Tor SOCKS host         │
 │                                                       override               │
-│ --tor-socks-port                INTEGER               Tor SOCKS port         │
+│ --tor-socks-port                <int>                 Tor SOCKS port         │
 │                                                       override               │
-│ --wallet-name           -w      TEXT                  Wallet identifier;     │
+│ --wallet-name           -w      <str>                 Wallet identifier;     │
 │                                                       defaults to the        │
 │                                                       mnemonic fingerprint   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
@@ -304,21 +304,21 @@ pytest tumbler/tests
  Print the current plan for the given wallet.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                      PATH  Config file path (decoupled from    │
-│                                          data dir). Defaults to              │
-│                                          <data-dir>/config.toml              │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --help                                   Show this message and exit.         │
-│ --log-level                -l      TEXT                                      │
-│ --mnemonic-file            -f      PATH  Path to mnemonic file               │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│                                          interactively                       │
-│ --wallet-name              -w      TEXT  Wallet identifier; defaults to the  │
-│                                          mnemonic fingerprint                │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>                                     │
+│ --mnemonic-file            -f      <path>  Path to mnemonic file             │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│                                            interactively                     │
+│ --wallet-name              -w      <str>   Wallet identifier; defaults to    │
+│                                            the mnemonic fingerprint          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 

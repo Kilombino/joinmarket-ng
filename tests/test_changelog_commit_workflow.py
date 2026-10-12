@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
-import importlib
 
 import pytest
-
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:

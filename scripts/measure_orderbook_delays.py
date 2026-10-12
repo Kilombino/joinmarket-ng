@@ -107,7 +107,7 @@ async def measure_response_delays(
                         logger.debug(f"Failed to parse message: {e}")
                         continue
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 except Exception as e:
                     logger.warning(f"Error receiving message: {e}")

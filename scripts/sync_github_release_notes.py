@@ -10,7 +10,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).parent.parent
 CHANGELOG = PROJECT_ROOT / "CHANGELOG.md"
 DEFAULT_REPOSITORY = "joinmarket-ng/joinmarket-ng"

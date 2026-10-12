@@ -75,10 +75,8 @@ def validate_message(message: str, source_label: str) -> ValidationResult:
 
     if parsed.type in CHANGELOG_TYPES and not parsed.changelog_entries:
         errors.append(
-            (
-                f"{source_label}: '{parsed.type}' commits must include at least one "
-                "'Changelog: ...' trailer in the commit body/footer"
-            )
+            f"{source_label}: '{parsed.type}' commits must include at least one "
+            "'Changelog: ...' trailer in the commit body/footer"
         )
 
     return ValidationResult(ok=not errors, errors=errors)

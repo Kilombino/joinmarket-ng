@@ -126,6 +126,8 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │ generate-hot-keypair         Generate a hot wallet keypair for fidelity bond │
 │                              certificates.                                   │
 │ history                      View CoinJoin transaction history.              │
+│ identity                     Remember public wallet identities, never        │
+│                              passphrases.                                    │
 │ import                       Import an existing BIP39 mnemonic phrase to     │
 │                              create/recover a wallet.                        │
 │ import-bond                  Manually import a fidelity bond into the        │
@@ -176,24 +178,24 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  Manage deposit addresses: reserve, label, release, and list.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend                  -b      TEXT  Backend: descriptor_wallet |        │
-│                                          neutrino                            │
-│ --config-file                      PATH  Config file path (defaults to       │
-│                                          <data-dir>/config.toml)             │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --help                                   Show this message and exit.         │
-│ --log-level                -l      TEXT  Log level                           │
-│ --mnemonic-file            -f      PATH  Path to mnemonic file               │
-│                                          [env var: MNEMONIC_FILE]            │
-│ --network                  -n      TEXT  Bitcoin network                     │
-│ --neutrino-url                     TEXT  [env var: NEUTRINO_URL]             │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│                                          interactively                       │
-│ --rpc-url                          TEXT  [env var: BITCOIN_RPC_URL]          │
+│ --backend                  -b      <str>   Backend: descriptor_wallet |      │
+│                                            neutrino                          │
+│ --config-file                      <path>  Config file path (defaults to     │
+│                                            <data-dir>/config.toml)           │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  Path to mnemonic file             │
+│                                            [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>   Bitcoin network                   │
+│ --neutrino-url                     <str>   [env var: NEUTRINO_URL]           │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│                                            interactively                     │
+│ --rpc-url                          <str>   [env var: BITCOIN_RPC_URL]        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
 │ label    Reserve an existing deposit address and attach a label to it.       │
@@ -211,7 +213,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet create-bond-address [OPTIONS] PUBKEY
+ Usage: jm-wallet create-bond-address [OPTIONS] {pubkey}
 
  Create a fidelity bond address from a public key (cold wallet workflow).
 
@@ -227,31 +229,31 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  See docs/fidelity-bond-operations.md for the maintained workflow.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│ *    pubkey      TEXT  [required]                                            │
+│ *    pubkey      <str>  Public key (hex, 33 bytes compressed) [required]     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --allow-expired                        Allow a past/current locktime for     │
-│                                        recovery or testing only              │
-│ --data-dir                    PATH     Data directory (default:              │
-│                                        ~/.joinmarket-ng or                   │
-│                                        $JOINMARKET_DATA_DIR)                 │
-│                                        [env var: JOINMARKET_DATA_DIR]        │
-│ --help                                 Show this message and exit.           │
-│ --locktime            -L      INTEGER  Locktime as Unix timestamp            │
-│                                        [default: 0]                          │
-│ --locktime-date       -d      TEXT     Locktime as date (YYYY-MM, must be    │
-│                                        1st of month)                         │
-│ --log-level           -l      TEXT     [default: INFO]                       │
-│ --network             -n      TEXT     [default: mainnet]                    │
-│ --no-save                              Do not save the bond to the registry  │
-│ --wallet-fingerprint          TEXT     8-char hex master key fingerprint of  │
-│                                        the JoinMarket wallet that will       │
-│                                        operate this bond. Run 'jm-wallet     │
-│                                        info --mnemonic-file <wallet>' on the │
-│                                        hot wallet to look it up. Required    │
-│                                        because each wallet has its own bond  │
-│                                        registry (fidelity_bonds_<fp>.json)   │
-│                                        under the shared data directory.      │
+│ --allow-expired                       Allow a past/current locktime for      │
+│                                       recovery or testing only               │
+│ --data-dir                    <path>  Data directory (default:               │
+│                                       ~/.joinmarket-ng or                    │
+│                                       $JOINMARKET_DATA_DIR)                  │
+│                                       [env var: JOINMARKET_DATA_DIR]         │
+│ --help                                Show this message and exit.            │
+│ --locktime            -L      <int>   Locktime as Unix timestamp             │
+│                                       [default: 0]                           │
+│ --locktime-date       -d      <str>   Locktime as date (YYYY-MM, must be 1st │
+│                                       of month)                              │
+│ --log-level           -l      <str>   [default: INFO]                        │
+│ --network             -n      <str>   [default: mainnet]                     │
+│ --no-save                             Do not save the bond to the registry   │
+│ --wallet-fingerprint          <str>   8-char hex master key fingerprint of   │
+│                                       the JoinMarket wallet that will        │
+│                                       operate this bond. Run 'jm-wallet info │
+│                                       --mnemonic-file <wallet>' on the hot   │
+│                                       wallet to look it up. Required because │
+│                                       each wallet has its own bond registry  │
+│                                       (fidelity_bonds_<fp>.json) under the   │
+│                                       shared data directory.                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -270,17 +272,17 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  No wallet keys, addresses, balances, or transaction data is included.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend       -b      TEXT  Backend: descriptor_wallet | neutrino          │
-│ --config-file           PATH  Config file path (decoupled from data dir).    │
-│                               Defaults to <data-dir>/config.toml             │
-│                               [env var: JOINMARKET_CONFIG_FILE]              │
-│ --data-dir              PATH  Data directory (default: ~/.joinmarket-ng or   │
-│                               $JOINMARKET_DATA_DIR)                          │
-│                               [env var: JOINMARKET_DATA_DIR]                 │
-│ --help                        Show this message and exit.                    │
-│ --log-level     -l      TEXT  Log level                                      │
-│ --network       -n      TEXT  Bitcoin network                                │
-│ --neutrino-url          TEXT  [env var: NEUTRINO_URL]                        │
+│ --backend       -b      <str>   Backend: descriptor_wallet | neutrino        │
+│ --config-file           <path>  Config file path (decoupled from data dir).  │
+│                                 Defaults to <data-dir>/config.toml           │
+│                                 [env var: JOINMARKET_CONFIG_FILE]            │
+│ --data-dir              <path>  Data directory (default: ~/.joinmarket-ng or │
+│                                 $JOINMARKET_DATA_DIR)                        │
+│                                 [env var: JOINMARKET_DATA_DIR]               │
+│ --help                          Show this message and exit.                  │
+│ --log-level     -l      <str>   Log level                                    │
+│ --network       -n      <str>   Bitcoin network                              │
+│ --neutrino-url          <str>   [env var: NEUTRINO_URL]                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -306,43 +308,43 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  Stop makers, takers, the wallet daemon, and other wallet users first.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --allow-fingerprint-mismatch                Proceed when the mnemonic .meta  │
-│                                             fingerprint differs from the     │
-│                                             derived wallet                   │
-│ --backend                     -b      TEXT  Backend: descriptor_wallet |     │
-│                                             neutrino                         │
-│ --config-file                         PATH  Config file path (decoupled from │
-│                                             data dir). Defaults to           │
-│                                             <data-dir>/config.toml           │
-│                                             [env var:                        │
-│                                             JOINMARKET_CONFIG_FILE]          │
-│ --core-wallet-dir                     PATH  Host-local Bitcoin Core          │
-│                                             -walletdir containing the        │
-│                                             descriptor wallet                │
-│ --data-dir                            PATH  Data directory (default:         │
-│                                             ~/.joinmarket-ng or              │
-│                                             $JOINMARKET_DATA_DIR)            │
-│                                             [env var: JOINMARKET_DATA_DIR]   │
-│ --delete-bond-registry                      Delete this wallet's             │
-│                                             fidelity-bond registry entries   │
-│ --delete-history                            Delete this wallet's             │
-│                                             fingerprint-scoped rows from     │
-│                                             history.csv                      │
-│ --dry-run                                   Show the deletion plan without   │
-│                                             changing anything                │
-│ --help                                      Show this message and exit.      │
-│ --keep-backend-wallet                       Keep the Bitcoin Core descriptor │
-│                                             wallet (required for remote Core │
-│                                             cleanup)                         │
-│ --log-level                   -l      TEXT  Log level                        │
-│ --mnemonic-file               -f      PATH  Path to mnemonic file            │
-│                                             [env var: MNEMONIC_FILE]         │
-│ --network                     -n      TEXT  Bitcoin network                  │
-│ --prompt-bip39-passphrase                   Prompt for the BIP39 passphrase  │
-│                                             used by this wallet              │
-│ --rpc-url                             TEXT  [env var: BITCOIN_RPC_URL]       │
-│ --yes                         -y            Skip the fingerprint             │
-│                                             confirmation prompt              │
+│ --allow-fingerprint-mismatch                  Proceed when the mnemonic      │
+│                                               .meta fingerprint differs from │
+│                                               the derived wallet             │
+│ --backend                     -b      <str>   Backend: descriptor_wallet |   │
+│                                               neutrino                       │
+│ --config-file                         <path>  Config file path (decoupled    │
+│                                               from data dir). Defaults to    │
+│                                               <data-dir>/config.toml         │
+│                                               [env var:                      │
+│                                               JOINMARKET_CONFIG_FILE]        │
+│ --core-wallet-dir                     <path>  Host-local Bitcoin Core        │
+│                                               -walletdir containing the      │
+│                                               descriptor wallet              │
+│ --data-dir                            <path>  Data directory (default:       │
+│                                               ~/.joinmarket-ng or            │
+│                                               $JOINMARKET_DATA_DIR)          │
+│                                               [env var: JOINMARKET_DATA_DIR] │
+│ --delete-bond-registry                        Delete this wallet's           │
+│                                               fidelity-bond registry entries │
+│ --delete-history                              Delete this wallet's           │
+│                                               fingerprint-scoped rows from   │
+│                                               history.csv                    │
+│ --dry-run                                     Show the deletion plan without │
+│                                               changing anything              │
+│ --help                                        Show this message and exit.    │
+│ --keep-backend-wallet                         Keep the Bitcoin Core          │
+│                                               descriptor wallet (required    │
+│                                               for remote Core cleanup)       │
+│ --log-level                   -l      <str>   Log level                      │
+│ --mnemonic-file               -f      <path>  Path to mnemonic file          │
+│                                               [env var: MNEMONIC_FILE]       │
+│ --network                     -n      <str>   Bitcoin network                │
+│ --prompt-bip39-passphrase                     Prompt for the BIP39           │
+│                                               passphrase used by this wallet │
+│ --rpc-url                             <str>   [env var: BITCOIN_RPC_URL]     │
+│ --yes                         -y              Skip the fingerprint           │
+│                                               confirmation prompt            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -368,28 +370,27 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  "unfreeze all" will unfreeze them.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend                  -b      TEXT     Backend: descriptor_wallet |     │
-│                                             neutrino                         │
-│ --config-file                      PATH     Config file path (decoupled from │
-│                                             data dir). Defaults to           │
-│                                             <data-dir>/config.toml           │
-│                                             [env var:                        │
-│                                             JOINMARKET_CONFIG_FILE]          │
-│ --data-dir                         PATH     Data directory (default:         │
-│                                             ~/.joinmarket-ng or              │
-│                                             $JOINMARKET_DATA_DIR)            │
-│                                             [env var: JOINMARKET_DATA_DIR]   │
-│ --help                                      Show this message and exit.      │
-│ --log-level                -l      TEXT     Log level                        │
-│ --mixdepth                 -m      INTEGER  Filter to a specific configured  │
-│                                             mixdepth                         │
-│ --mnemonic-file            -f      PATH     Path to mnemonic file            │
-│                                             [env var: MNEMONIC_FILE]         │
-│ --network                  -n      TEXT     Bitcoin network                  │
-│ --neutrino-url                     TEXT     [env var: NEUTRINO_URL]          │
-│ --prompt-bip39-passphrase                   Prompt for BIP39 passphrase      │
-│                                             interactively                    │
-│ --rpc-url                          TEXT     [env var: BITCOIN_RPC_URL]       │
+│ --backend                  -b      <str>   Backend: descriptor_wallet |      │
+│                                            neutrino                          │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>   Log level                         │
+│ --mixdepth                 -m      <int>   Filter to a specific configured   │
+│                                            mixdepth                          │
+│ --mnemonic-file            -f      <path>  Path to mnemonic file             │
+│                                            [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>   Bitcoin network                   │
+│ --neutrino-url                     <str>   [env var: NEUTRINO_URL]           │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│                                            interactively                     │
+│ --rpc-url                          <str>   [env var: BITCOIN_RPC_URL]        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -411,7 +412,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  saving.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --data-dir                                     PATH     Data directory       │
+│ --data-dir                                      <path>  Data directory       │
 │                                                         (default:            │
 │                                                         ~/.joinmarket-ng or  │
 │                                                         $JOINMARKET_DATA_DI… │
@@ -421,21 +422,26 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                         <data-dir>/wallets/… │
 │                                                         [env var:            │
 │                                                         JOINMARKET_DATA_DIR] │
-│ --force            -f                                   Overwrite existing   │
+│ --force              -f                                 Overwrite existing   │
 │                                                         file without         │
 │                                                         confirmation         │
 │ --help                                                  Show this message    │
 │                                                         and exit.            │
-│ --output           -o                          PATH     Output file path     │
-│ --prompt-password      --no-prompt-password             Prompt for password  │
+│ --output             -o                         <path>  Output file path     │
+│ --prompt-password        --no-prompt-passwo…            Prompt for password  │
 │                                                         interactively        │
 │                                                         (default: prompt)    │
 │                                                         [default:            │
 │                                                         prompt-password]     │
-│ --save                 --no-save                        Save to file         │
+│ --register-identity      --no-register-iden…            Confirm and select a │
+│                                                         derived wallet       │
+│                                                         identity (default:   │
+│                                                         follow BIP39         │
+│                                                         setting)             │
+│ --save                   --no-save                      Save to file         │
 │                                                         (default: save)      │
 │                                                         [default: save]      │
-│ --words            -w                          INTEGER  Number of words (12, │
+│ --words              -w                         <int>   Number of words (12, │
 │                                                         15, 18, 21, or 24)   │
 │                                                         [default: 24]        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
@@ -453,26 +459,25 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  Generate a fidelity bond (timelocked P2WSH) address.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                      PATH     Config file path (decoupled from │
-│                                             data dir). Defaults to           │
-│                                             <data-dir>/config.toml           │
-│                                             [env var:                        │
-│                                             JOINMARKET_CONFIG_FILE]          │
-│ --data-dir                         PATH     Data directory (default:         │
-│                                             ~/.joinmarket-ng or              │
-│                                             $JOINMARKET_DATA_DIR)            │
-│                                             [env var: JOINMARKET_DATA_DIR]   │
-│ --help                                      Show this message and exit.      │
-│ --locktime                 -L      INTEGER  Locktime as Unix timestamp       │
-│                                             [default: 0]                     │
-│ --locktime-date            -d      TEXT     Locktime as YYYY-MM (must be 1st │
-│                                             of month)                        │
-│ --log-level                -l      TEXT     Log level                        │
-│ --mnemonic-file            -f      PATH     [env var: MNEMONIC_FILE]         │
-│ --network                  -n      TEXT                                      │
-│ --no-save                                   Do not save the bond to the      │
-│                                             registry                         │
-│ --prompt-bip39-passphrase                   Prompt for BIP39 passphrase      │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --locktime                 -L      <int>   Locktime as Unix timestamp        │
+│                                            [default: 0]                      │
+│ --locktime-date            -d      <str>   Locktime as YYYY-MM (must be 1st  │
+│                                            of month)                         │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>                                     │
+│ --no-save                                  Do not save the bond to the       │
+│                                            registry                          │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -503,20 +508,22 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  - But they CANNOT spend your bond funds (those remain in cold storage)
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --bond-address              TEXT  Bond address to associate keypair with     │
-│                                   (saves to registry)                        │
-│ --data-dir                  PATH  Data directory (default: ~/.joinmarket-ng  │
-│                                   or $JOINMARKET_DATA_DIR)                   │
-│                                   [env var: JOINMARKET_DATA_DIR]             │
-│ --help                            Show this message and exit.                │
-│ --log-level                 TEXT  [default: INFO]                            │
-│ --wallet-fingerprint        TEXT  8-char hex master key fingerprint of the   │
-│                                   JoinMarket wallet that will operate this   │
-│                                   bond. Run 'jm-wallet info --mnemonic-file  │
-│                                   <wallet>' on the hot wallet to look it up. │
-│                                   Required because each wallet has its own   │
-│                                   bond registry (fidelity_bonds_<fp>.json)   │
-│                                   under the shared data directory.           │
+│ --bond-address              <str>   Bond address to associate keypair with   │
+│                                     (saves to registry)                      │
+│ --data-dir                  <path>  Data directory (default:                 │
+│                                     ~/.joinmarket-ng or                      │
+│                                     $JOINMARKET_DATA_DIR)                    │
+│                                     [env var: JOINMARKET_DATA_DIR]           │
+│ --help                              Show this message and exit.              │
+│ --log-level                 <str>   [default: INFO]                          │
+│ --wallet-fingerprint        <str>   8-char hex master key fingerprint of the │
+│                                     JoinMarket wallet that will operate this │
+│                                     bond. Run 'jm-wallet info                │
+│                                     --mnemonic-file <wallet>' on the hot     │
+│                                     wallet to look it up. Required because   │
+│                                     each wallet has its own bond registry    │
+│                                     (fidelity_bonds_<fp>.json) under the     │
+│                                     shared data directory.                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -538,55 +545,74 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  Pass ``--all-wallets`` to disable per-wallet filtering entirely.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --all-wallets                               Show entries from all wallets    │
-│                                             that have ever written to this   │
-│                                             data directory, including legacy │
-│                                             rows without a fingerprint.      │
-│ --config-file                      PATH     Config file path (decoupled from │
-│                                             data dir). Defaults to           │
-│                                             <data-dir>/config.toml           │
-│                                             [env var:                        │
-│                                             JOINMARKET_CONFIG_FILE]          │
-│ --csv                                       Output as CSV                    │
-│ --data-dir                         PATH     Data directory (default:         │
-│                                             ~/.joinmarket-ng or              │
-│                                             $JOINMARKET_DATA_DIR)            │
-│                                             [env var: JOINMARKET_DATA_DIR]   │
-│ --help                                      Show this message and exit.      │
-│ --limit                    -n      INTEGER  Max entries to show              │
-│ --log-level                -l      TEXT     Log level                        │
-│ --mnemonic-file            -f      PATH     Path to mnemonic file. When      │
-│                                             provided, the history is         │
-│                                             filtered to entries belonging to │
-│                                             this wallet (matched by BIP32    │
-│                                             master fingerprint). Required    │
-│                                             when multiple wallets share the  │
-│                                             same data directory (issue #473) │
-│                                             unless --wallet-fingerprint is   │
-│                                             passed instead.                  │
-│                                             [env var: MNEMONIC_FILE]         │
-│ --prompt-bip39-passphrase                   Prompt for the BIP39 passphrase  │
-│                                             when deriving the wallet         │
-│                                             fingerprint from                 │
-│                                             --mnemonic-file. Required when   │
-│                                             the wallet was created with a    │
-│                                             BIP39 passphrase, otherwise the  │
-│                                             derived fingerprint will not     │
-│                                             match any recorded history.      │
-│ --role                     -r      TEXT     Filter by role                   │
-│                                             (maker/taker/send/deposit)       │
-│ --stats                    -s               Show statistics only             │
-│ --wallet-fingerprint               TEXT     Filter history to this 8-char    │
-│                                             hex BIP32 master fingerprint.    │
-│                                             Use this instead of              │
-│                                             --mnemonic-file when you already │
-│                                             know the fingerprint (e.g.       │
-│                                             printed by 'jm-wallet info').    │
-│                                             When neither this flag nor       │
-│                                             --mnemonic-file is given and     │
-│                                             history contains exactly one     │
-│                                             wallet, that wallet is selected  │
-│                                             automatically.                   │
+│ --all-wallets                              Show entries from all wallets     │
+│                                            that have ever written to this    │
+│                                            data directory, including legacy  │
+│                                            rows without a fingerprint.       │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --csv                                      Output as CSV                     │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --limit                    -n      <int>   Max entries to show               │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  Path to mnemonic file. When       │
+│                                            provided, the history is filtered │
+│                                            to entries belonging to this      │
+│                                            wallet (matched by BIP32 master   │
+│                                            fingerprint). Required when       │
+│                                            multiple wallets share the same   │
+│                                            data directory (issue #473)       │
+│                                            unless --wallet-fingerprint is    │
+│                                            passed instead.                   │
+│                                            [env var: MNEMONIC_FILE]          │
+│ --prompt-bip39-passphrase                  Prompt for the BIP39 passphrase   │
+│                                            when deriving the wallet          │
+│                                            fingerprint from --mnemonic-file. │
+│                                            Required when the wallet was      │
+│                                            created with a BIP39 passphrase,  │
+│                                            otherwise the derived fingerprint │
+│                                            will not match any recorded       │
+│                                            history.                          │
+│ --role                     -r      <str>   Filter by role                    │
+│                                            (maker/taker/send/deposit)        │
+│ --stats                    -s              Show statistics only              │
+│ --wallet-fingerprint               <str>   Filter history to this 8-char hex │
+│                                            BIP32 master fingerprint. Use     │
+│                                            this instead of --mnemonic-file   │
+│                                            when you already know the         │
+│                                            fingerprint (e.g. printed by      │
+│                                            'jm-wallet info'). When neither   │
+│                                            this flag nor --mnemonic-file is  │
+│                                            given and history contains        │
+│                                            exactly one wallet, that wallet   │
+│                                            is selected automatically.        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+</details>
+
+<details>
+<summary><code>jm-wallet identity --help</code></summary>
+
+```
+
+ Usage: jm-wallet identity [OPTIONS] COMMAND [ARGS]...
+
+ Remember public wallet identities, never passphrases.
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ list                                                                         │
+│ register                                                                     │
+│ select                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -616,7 +642,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
      jm-wallet import -o my-wallet.mnemonic    # Custom output file
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --data-dir                                     PATH     Data directory       │
+│ --data-dir                                      <path>  Data directory       │
 │                                                         (default:            │
 │                                                         ~/.joinmarket-ng or  │
 │                                                         $JOINMARKET_DATA_DI… │
@@ -626,18 +652,23 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                         <data-dir>/wallets/… │
 │                                                         [env var:            │
 │                                                         JOINMARKET_DATA_DIR] │
-│ --force            -f                                   Overwrite existing   │
+│ --force              -f                                 Overwrite existing   │
 │                                                         file without         │
 │                                                         confirmation         │
 │ --help                                                  Show this message    │
 │                                                         and exit.            │
-│ --output           -o                          PATH     Output file path     │
-│ --prompt-password      --no-prompt-password             Prompt for password  │
+│ --output             -o                         <path>  Output file path     │
+│ --prompt-password        --no-prompt-passwo…            Prompt for password  │
 │                                                         interactively        │
 │                                                         (default: prompt)    │
 │                                                         [default:            │
 │                                                         prompt-password]     │
-│ --words            -w                          INTEGER  Number of words (12, │
+│ --register-identity      --no-register-iden…            Confirm and select a │
+│                                                         derived wallet       │
+│                                                         identity (default:   │
+│                                                         follow BIP39         │
+│                                                         setting)             │
+│ --words              -w                         <int>   Number of words (12, │
 │                                                         15, 18, 21, or 24)   │
 │                                                         [default: 24]        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
@@ -664,29 +695,28 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
      jm-wallet import-bond --timenumber 73
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                      PATH     Config file path (decoupled from │
-│                                             data dir). Defaults to           │
-│                                             <data-dir>/config.toml           │
-│                                             [env var:                        │
-│                                             JOINMARKET_CONFIG_FILE]          │
-│ --data-dir                         PATH     Data directory (default:         │
-│                                             ~/.joinmarket-ng or              │
-│                                             $JOINMARKET_DATA_DIR)            │
-│                                             [env var: JOINMARKET_DATA_DIR]   │
-│ --help                                      Show this message and exit.      │
-│ --locktime                 -L      INTEGER  Locktime as Unix timestamp       │
-│                                             [default: 0]                     │
-│ --locktime-date            -d      TEXT     Locktime as YYYY-MM (must be 1st │
-│                                             of month)                        │
-│ --log-level                -l      TEXT     Log level                        │
-│ --mnemonic-file            -f      PATH     [env var: MNEMONIC_FILE]         │
-│ --network                  -n      TEXT                                      │
-│ --path                     -p      TEXT     Full derivation path with        │
-│                                             locktime, e.g.                   │
-│                                             m/84'/0'/0'/2/73:1740787200      │
-│ --prompt-bip39-passphrase                   Prompt for BIP39 passphrase      │
-│ --timenumber               -t      INTEGER  Timenumber (0-959). Auto-derived │
-│                                             if omitted.                      │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --locktime                 -L      <int>   Locktime as Unix timestamp        │
+│                                            [default: 0]                      │
+│ --locktime-date            -d      <str>   Locktime as YYYY-MM (must be 1st  │
+│                                            of month)                         │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>                                     │
+│ --path                     -p      <str>   Full derivation path with         │
+│                                            locktime, e.g.                    │
+│                                            m/84'/0'/0'/2/73:1740787200       │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│ --timenumber               -t      <int>   Timenumber (0-959). Auto-derived  │
+│                                            if omitted.                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -697,30 +727,30 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet import-bond-registration [OPTIONS] [REGISTRATION]
+ Usage: jm-wallet import-bond-registration [OPTIONS] [registration]
 
  Import a verified SeedSigner BIP46 fidelity-bond registration payload.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│   registration      [REGISTRATION]                                           │
+│   registration      <str>  Canonical SeedSigner BIP46 registration JSON      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --data-dir                    PATH  Data directory (default:                 │
-│                                     ~/.joinmarket-ng or                      │
-│                                     $JOINMARKET_DATA_DIR)                    │
-│                                     [env var: JOINMARKET_DATA_DIR]           │
-│ --file                        PATH  File containing canonical SeedSigner     │
-│                                     BIP46 registration JSON                  │
-│ --help                              Show this message and exit.              │
-│ --log-level           -l      TEXT  [default: INFO]                          │
-│ --wallet-fingerprint          TEXT  8-char hex master key fingerprint of the │
-│                                     JoinMarket wallet that will operate this │
-│                                     bond. Run 'jm-wallet info                │
-│                                     --mnemonic-file <wallet>' on the hot     │
-│                                     wallet to look it up. Required because   │
-│                                     each wallet has its own bond registry    │
-│                                     (fidelity_bonds_<fp>.json) under the     │
-│                                     shared data directory.                   │
+│ --data-dir                    <path>  Data directory (default:               │
+│                                       ~/.joinmarket-ng or                    │
+│                                       $JOINMARKET_DATA_DIR)                  │
+│                                       [env var: JOINMARKET_DATA_DIR]         │
+│ --file                        <path>  File containing canonical SeedSigner   │
+│                                       BIP46 registration JSON                │
+│ --help                                Show this message and exit.            │
+│ --log-level           -l      <str>   [default: INFO]                        │
+│ --wallet-fingerprint          <str>   8-char hex master key fingerprint of   │
+│                                       the JoinMarket wallet that will        │
+│                                       operate this bond. Run 'jm-wallet info │
+│                                       --mnemonic-file <wallet>' on the hot   │
+│                                       wallet to look it up. Required because │
+│                                       each wallet has its own bond registry  │
+│                                       (fidelity_bonds_<fp>.json) under the   │
+│                                       shared data directory.                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -731,7 +761,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet import-certificate [OPTIONS] ADDRESS
+ Usage: jm-wallet import-certificate [OPTIONS] {address}
 
  Import a certificate signature for a fidelity bond (cold wallet support).
 
@@ -751,42 +781,42 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  using the 'Standard (Electrum)' format.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│ *    address      TEXT  [required]                                           │
+│ *    address      <str>  Bond address [required]                             │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend             -b      TEXT     Backend: descriptor_wallet | neutrino │
-│ --cert-expiry                 INTEGER  Certificate expiry as ABSOLUTE period │
-│                                        number (from                          │
-│                                        prepare-certificate-message)          │
-│                                        [default: 0]                          │
-│ --cert-pubkey                 TEXT     Certificate pubkey (hex)              │
-│ --cert-signature              TEXT     Certificate signature (base64)        │
-│ --config-file                 PATH     Config file path (decoupled from data │
-│                                        dir). Defaults to                     │
-│                                        <data-dir>/config.toml                │
-│                                        [env var: JOINMARKET_CONFIG_FILE]     │
-│ --current-block               INTEGER  Current block height override for     │
-│                                        offline/air-gapped workflows. Skips   │
-│                                        all network block-height lookups.     │
-│ --data-dir                    PATH     Data directory (default:              │
-│                                        ~/.joinmarket-ng or                   │
-│                                        $JOINMARKET_DATA_DIR)                 │
-│                                        [env var: JOINMARKET_DATA_DIR]        │
-│ --help                                 Show this message and exit.           │
-│ --log-level                   TEXT     [default: INFO]                       │
-│ --network             -n      TEXT     Bitcoin network                       │
-│ --neutrino-url                TEXT     [env var: NEUTRINO_URL]               │
-│ --rpc-url                     TEXT     [env var: BITCOIN_RPC_URL]            │
-│ --skip-verification                    Skip signature verification (not      │
-│                                        recommended)                          │
-│ --wallet-fingerprint          TEXT     8-char hex master key fingerprint of  │
-│                                        the JoinMarket wallet that will       │
-│                                        operate this bond. Run 'jm-wallet     │
-│                                        info --mnemonic-file <wallet>' on the │
-│                                        hot wallet to look it up. Required    │
-│                                        because each wallet has its own bond  │
-│                                        registry (fidelity_bonds_<fp>.json)   │
-│                                        under the shared data directory.      │
+│ --backend             -b      <str>   Backend: descriptor_wallet | neutrino  │
+│ --cert-expiry                 <int>   Certificate expiry as ABSOLUTE period  │
+│                                       number (from                           │
+│                                       prepare-certificate-message)           │
+│                                       [default: 0]                           │
+│ --cert-pubkey                 <str>   Certificate pubkey (hex)               │
+│ --cert-signature              <str>   Certificate signature (base64)         │
+│ --config-file                 <path>  Config file path (decoupled from data  │
+│                                       dir). Defaults to                      │
+│                                       <data-dir>/config.toml                 │
+│                                       [env var: JOINMARKET_CONFIG_FILE]      │
+│ --current-block               <int>   Current block height override for      │
+│                                       offline/air-gapped workflows. Skips    │
+│                                       all network block-height lookups.      │
+│ --data-dir                    <path>  Data directory (default:               │
+│                                       ~/.joinmarket-ng or                    │
+│                                       $JOINMARKET_DATA_DIR)                  │
+│                                       [env var: JOINMARKET_DATA_DIR]         │
+│ --help                                Show this message and exit.            │
+│ --log-level                   <str>   [default: INFO]                        │
+│ --network             -n      <str>   Bitcoin network                        │
+│ --neutrino-url                <str>   [env var: NEUTRINO_URL]                │
+│ --rpc-url                     <str>   [env var: BITCOIN_RPC_URL]             │
+│ --skip-verification                   Skip signature verification (not       │
+│                                       recommended)                           │
+│ --wallet-fingerprint          <str>   8-char hex master key fingerprint of   │
+│                                       the JoinMarket wallet that will        │
+│                                       operate this bond. Run 'jm-wallet info │
+│                                       --mnemonic-file <wallet>' on the hot   │
+│                                       wallet to look it up. Required because │
+│                                       each wallet has its own bond registry  │
+│                                       (fidelity_bonds_<fp>.json) under the   │
+│                                       shared data directory.                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -802,74 +832,73 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  Display wallet information and balances by mixdepth.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend              -b                     TEXT     Backend:              │
-│                                                        descriptor_wallet |   │
-│                                                        neutrino              │
-│ --config-file                                 PATH     Config file path      │
-│                                                        (decoupled from data  │
-│                                                        dir). Defaults to     │
-│                                                        <data-dir>/config.to… │
-│                                                        [env var:             │
-│                                                        JOINMARKET_CONFIG_FI… │
-│ --data-dir                                    PATH     Data directory        │
-│                                                        (default:             │
-│                                                        ~/.joinmarket-ng or   │
-│                                                        $JOINMARKET_DATA_DIR) │
-│                                                        [env var:             │
-│                                                        JOINMARKET_DATA_DIR]  │
-│ --extended             -e                              Show detailed         │
-│                                                        addresses,            │
-│                                                        derivations, and UTXO │
-│                                                        outpoints             │
-│ --gap                  -g                     INTEGER  Max address gap to    │
-│                                                        show in extended view │
-│                                                        [default: 6]          │
-│ --help                                                 Show this message and │
-│                                                        exit.                 │
-│ --log-level            -l                     TEXT     Log level             │
-│ --mnemonic-file        -f                     PATH     Path to mnemonic file │
-│                                                        [env var:             │
-│                                                        MNEMONIC_FILE]        │
-│ --network              -n                     TEXT     Bitcoin network       │
-│ --neutrino-url                                TEXT     [env var:             │
-│                                                        NEUTRINO_URL]         │
-│ --prompt-bip39-passp…                                  Prompt for BIP39      │
-│                                                        passphrase            │
-│                                                        interactively         │
-│ --rpc-url                                     TEXT     [env var:             │
-│                                                        BITCOIN_RPC_URL]      │
-│ --scan-status                                          Print Bitcoin Core's  │
-│                                                        wallet scan/coverage  │
-│                                                        diagnostics and exit  │
-│                                                        (descriptor wallet    │
-│                                                        only). Use it when    │
-│                                                        the wallet proposes   │
-│                                                        already-used          │
-│                                                        addresses; if         │
-│                                                        coverage is           │
-│                                                        incomplete, repair it │
-│                                                        with `jm-wallet       │
-│                                                        rescan`. See the      │
-│                                                        wallet scanning docs. │
-│ --show-empty               --no-show-empty             In --extended view,   │
-│                                                        show addresses with   │
-│                                                        zero balance. When    │
-│                                                        disabled (default),   │
-│                                                        empty addresses are   │
-│                                                        hidden except for the │
-│                                                        first unused one per  │
-│                                                        branch so you still   │
-│                                                        have a fresh receive  │
-│                                                        address.              │
-│                                                        [default:             │
-│                                                        no-show-empty]        │
-│ --show-utxos                                           In the basic view,    │
-│                                                        add a per-mixdepth    │
-│                                                        UTXO breakdown        │
-│                                                        grouped by type       │
-│                                                        (cj-out, cj-change,   │
-│                                                        deposit, reg-change)  │
-│                                                        plus fidelity bonds.  │
+│ --backend              -b                     <str>   Backend:               │
+│                                                       descriptor_wallet |    │
+│                                                       neutrino               │
+│ --config-file                                 <path>  Config file path       │
+│                                                       (decoupled from data   │
+│                                                       dir). Defaults to      │
+│                                                       <data-dir>/config.toml │
+│                                                       [env var:              │
+│                                                       JOINMARKET_CONFIG_FIL… │
+│ --data-dir                                    <path>  Data directory         │
+│                                                       (default:              │
+│                                                       ~/.joinmarket-ng or    │
+│                                                       $JOINMARKET_DATA_DIR)  │
+│                                                       [env var:              │
+│                                                       JOINMARKET_DATA_DIR]   │
+│ --extended             -e                             Show detailed          │
+│                                                       addresses,             │
+│                                                       derivations, and UTXO  │
+│                                                       outpoints              │
+│ --gap                  -g                     <int>   Max address gap to     │
+│                                                       show in extended view  │
+│                                                       [default: 6]           │
+│ --help                                                Show this message and  │
+│                                                       exit.                  │
+│ --log-level            -l                     <str>   Log level              │
+│ --mnemonic-file        -f                     <path>  Path to mnemonic file  │
+│                                                       [env var:              │
+│                                                       MNEMONIC_FILE]         │
+│ --network              -n                     <str>   Bitcoin network        │
+│ --neutrino-url                                <str>   [env var:              │
+│                                                       NEUTRINO_URL]          │
+│ --prompt-bip39-passp…                                 Prompt for BIP39       │
+│                                                       passphrase             │
+│                                                       interactively          │
+│ --rpc-url                                     <str>   [env var:              │
+│                                                       BITCOIN_RPC_URL]       │
+│ --scan-status                                         Print Bitcoin Core's   │
+│                                                       wallet scan/coverage   │
+│                                                       diagnostics and exit   │
+│                                                       (descriptor wallet     │
+│                                                       only). Use it when the │
+│                                                       wallet proposes        │
+│                                                       already-used           │
+│                                                       addresses; if coverage │
+│                                                       is incomplete, repair  │
+│                                                       it with `jm-wallet     │
+│                                                       rescan`. See the       │
+│                                                       wallet scanning docs.  │
+│ --show-empty               --no-show-empty            In --extended view,    │
+│                                                       show addresses with    │
+│                                                       zero balance. When     │
+│                                                       disabled (default),    │
+│                                                       empty addresses are    │
+│                                                       hidden except for the  │
+│                                                       first unused one per   │
+│                                                       branch so you still    │
+│                                                       have a fresh receive   │
+│                                                       address.               │
+│                                                       [default:              │
+│                                                       no-show-empty]         │
+│ --show-utxos                                          In the basic view, add │
+│                                                       a per-mixdepth UTXO    │
+│                                                       breakdown grouped by   │
+│                                                       type (cj-out,          │
+│                                                       cj-change, deposit,    │
+│                                                       reg-change) plus       │
+│                                                       fidelity bonds.        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -896,38 +925,39 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  auto-detected when only one wallet's registry exists in the data dir.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --active-only                            Show only active bonds              │
-│ --config-file                      PATH  Config file path (decoupled from    │
-│                                          data dir). Defaults to              │
-│                                          <data-dir>/config.toml              │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --funded-only                            Show only funded bonds              │
-│ --help                                   Show this message and exit.         │
-│ --json                     -j            Output as JSON                      │
-│ --log-level                -l      TEXT  Log level                           │
-│ --mnemonic-file            -f      PATH  Select the per-wallet bond registry │
-│                                          by deriving its fingerprint from    │
-│                                          this mnemonic file. This does NOT   │
-│                                          scan the blockchain; use 'jm-wallet │
-│                                          recover-bonds' to discover bonds    │
-│                                          on-chain.                           │
-│                                          [env var: MNEMONIC_FILE]            │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│ --wallet-fingerprint               TEXT  Select the per-wallet bond registry │
-│                                          by its 8-char hex BIP32 master      │
-│                                          fingerprint. Use this instead of    │
-│                                          --mnemonic-file when you already    │
-│                                          know the fingerprint (e.g. from     │
-│                                          'jm-wallet info'). When neither     │
-│                                          --mnemonic-file nor this flag is    │
-│                                          provided and exactly one wallet has │
-│                                          a registry in the data directory,   │
-│                                          that wallet is selected             │
-│                                          automatically.                      │
+│ --active-only                              Show only active bonds            │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --funded-only                              Show only funded bonds            │
+│ --help                                     Show this message and exit.       │
+│ --json                     -j              Output as JSON                    │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  Select the per-wallet bond        │
+│                                            registry by deriving its          │
+│                                            fingerprint from this mnemonic    │
+│                                            file. This does NOT scan the      │
+│                                            blockchain; use 'jm-wallet        │
+│                                            recover-bonds' to discover bonds  │
+│                                            on-chain.                         │
+│                                            [env var: MNEMONIC_FILE]          │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│ --wallet-fingerprint               <str>   Select the per-wallet bond        │
+│                                            registry by its 8-char hex BIP32  │
+│                                            master fingerprint. Use this      │
+│                                            instead of --mnemonic-file when   │
+│                                            you already know the fingerprint  │
+│                                            (e.g. from 'jm-wallet info').     │
+│                                            When neither --mnemonic-file nor  │
+│                                            this flag is provided and exactly │
+│                                            one wallet has a registry in the  │
+│                                            data directory, that wallet is    │
+│                                            selected automatically.           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -938,7 +968,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet prepare-certificate-message [OPTIONS] BOND_ADDRESS
+ Usage: jm-wallet prepare-certificate-message [OPTIONS] {bond_address}
 
  Prepare certificate message for signing with hardware wallet (cold wallet
  support).
@@ -963,38 +993,38 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  takers accept the certificate at its boundary block and reject it afterward.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│ *    bond_address      TEXT  [required]                                      │
+│ *    bond_address      <str>  Bond P2WSH address [required]                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend             -b      TEXT     Backend: descriptor_wallet | neutrino │
-│ --cert-pubkey                 TEXT     Certificate public key (hex)          │
-│ --config-file                 PATH     Config file path (decoupled from data │
-│                                        dir). Defaults to                     │
-│                                        <data-dir>/config.toml                │
-│                                        [env var: JOINMARKET_CONFIG_FILE]     │
-│ --current-block               INTEGER  Current block height override for     │
-│                                        offline/air-gapped workflows. Skips   │
-│                                        all network block-height lookups.     │
-│ --data-dir                    PATH     Data directory (default:              │
-│                                        ~/.joinmarket-ng or                   │
-│                                        $JOINMARKET_DATA_DIR)                 │
-│                                        [env var: JOINMARKET_DATA_DIR]        │
-│ --help                                 Show this message and exit.           │
-│ --log-level                   TEXT     [default: INFO]                       │
-│ --network             -n      TEXT     Bitcoin network                       │
-│ --neutrino-url                TEXT     [env var: NEUTRINO_URL]               │
-│ --rpc-url                     TEXT     [env var: BITCOIN_RPC_URL]            │
-│ --validity-periods            INTEGER  Certificate validity in 2016-block    │
-│                                        periods from now (1=~2wk, 52=~2yr)    │
-│                                        [default: 52]                         │
-│ --wallet-fingerprint          TEXT     8-char hex master key fingerprint of  │
-│                                        the JoinMarket wallet that will       │
-│                                        operate this bond. Run 'jm-wallet     │
-│                                        info --mnemonic-file <wallet>' on the │
-│                                        hot wallet to look it up. Required    │
-│                                        because each wallet has its own bond  │
-│                                        registry (fidelity_bonds_<fp>.json)   │
-│                                        under the shared data directory.      │
+│ --backend             -b      <str>   Backend: descriptor_wallet | neutrino  │
+│ --cert-pubkey                 <str>   Certificate public key (hex)           │
+│ --config-file                 <path>  Config file path (decoupled from data  │
+│                                       dir). Defaults to                      │
+│                                       <data-dir>/config.toml                 │
+│                                       [env var: JOINMARKET_CONFIG_FILE]      │
+│ --current-block               <int>   Current block height override for      │
+│                                       offline/air-gapped workflows. Skips    │
+│                                       all network block-height lookups.      │
+│ --data-dir                    <path>  Data directory (default:               │
+│                                       ~/.joinmarket-ng or                    │
+│                                       $JOINMARKET_DATA_DIR)                  │
+│                                       [env var: JOINMARKET_DATA_DIR]         │
+│ --help                                Show this message and exit.            │
+│ --log-level                   <str>   [default: INFO]                        │
+│ --network             -n      <str>   Bitcoin network                        │
+│ --neutrino-url                <str>   [env var: NEUTRINO_URL]                │
+│ --rpc-url                     <str>   [env var: BITCOIN_RPC_URL]             │
+│ --validity-periods            <int>   Certificate validity in 2016-block     │
+│                                       periods from now (1=~2wk, 52=~2yr)     │
+│                                       [default: 52]                          │
+│ --wallet-fingerprint          <str>   8-char hex master key fingerprint of   │
+│                                       the JoinMarket wallet that will        │
+│                                       operate this bond. Run 'jm-wallet info │
+│                                       --mnemonic-file <wallet>' on the hot   │
+│                                       wallet to look it up. Required because │
+│                                       each wallet has its own bond registry  │
+│                                       (fidelity_bonds_<fp>.json) under the   │
+│                                       shared data directory.                 │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1017,17 +1047,17 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  first so the guessed portion is rebuilt from scratch.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend          -b                     TEXT              Backend:         │
+│ --backend          -b                     <str>             Backend:         │
 │                                                             descriptor_wall… │
 │                                                             | neutrino       │
-│ --config-file                             PATH              Config file path │
+│ --config-file                             <path>            Config file path │
 │                                                             (decoupled from  │
 │                                                             data dir).       │
 │                                                             Defaults to      │
 │                                                             <data-dir>/conf… │
 │                                                             [env var:        │
 │                                                             JOINMARKET_CONF… │
-│ --data-dir                                PATH              Data directory   │
+│ --data-dir                                <path>            Data directory   │
 │                                                             (default:        │
 │                                                             ~/.joinmarket-ng │
 │                                                             or               │
@@ -1048,20 +1078,20 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                             kept either way. │
 │                                                             [default:        │
 │                                                             purge-existing]  │
-│ --log-level        -l                     TEXT              Log level        │
-│ --max-transactio…                         INTEGER RANGE     Safety cap on    │
+│ --log-level        -l                     <str>             Log level        │
+│ --max-transactio…                         <int range>       Safety cap on    │
 │                                           [x>=1]            transactions     │
 │                                                             classified in    │
 │                                                             one pass         │
 │                                                             [default: 1000]  │
-│ --mnemonic-file    -f                     PATH              [env var:        │
+│ --mnemonic-file    -f                     <path>            [env var:        │
 │                                                             MNEMONIC_FILE]   │
-│ --network          -n                     TEXT              Bitcoin network  │
-│ --neutrino-url                            TEXT              [env var:        │
+│ --network          -n                     <str>             Bitcoin network  │
+│ --neutrino-url                            <str>             [env var:        │
 │                                                             NEUTRINO_URL]    │
 │ --prompt-bip39-p…                                           Prompt for BIP39 │
 │                                                             passphrase       │
-│ --rpc-url                                 TEXT              [env var:        │
+│ --rpc-url                                 <str>             [env var:        │
 │                                                             BITCOIN_RPC_URL] │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
@@ -1091,26 +1121,26 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  for confirmation; use the same BIP39 passphrase as the recovered wallet.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend                  -b      TEXT  Backend: descriptor_wallet |        │
-│                                          neutrino                            │
-│ --config-file                      PATH  Config file path (decoupled from    │
-│                                          data dir). Defaults to              │
-│                                          <data-dir>/config.toml              │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --help                                   Show this message and exit.         │
-│ --log-level                -l      TEXT  Log level                           │
-│ --mark-scanned                           Confirm prior full bond recovery    │
-│                                          and record completion without       │
-│                                          scanning (offline).                 │
-│ --mnemonic-file            -f      PATH  [env var: MNEMONIC_FILE]            │
-│ --network                  -n      TEXT  Bitcoin network                     │
-│ --neutrino-url                     TEXT  [env var: NEUTRINO_URL]             │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│ --rpc-url                          TEXT  [env var: BITCOIN_RPC_URL]          │
+│ --backend                  -b      <str>   Backend: descriptor_wallet |      │
+│                                            neutrino                          │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>   Log level                         │
+│ --mark-scanned                             Confirm prior full bond recovery  │
+│                                            and record completion without     │
+│                                            scanning (offline).               │
+│ --mnemonic-file            -f      <path>  [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>   Bitcoin network                   │
+│ --neutrino-url                     <str>   [env var: NEUTRINO_URL]           │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│ --rpc-url                          <str>   [env var: BITCOIN_RPC_URL]        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1121,37 +1151,37 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet registry-show [OPTIONS] ADDRESS
+ Usage: jm-wallet registry-show [OPTIONS] {address}
 
  Show detailed information about a specific fidelity bond.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│ *    address      TEXT  [required]                                           │
+│ *    address      <str>  Bond address to show [required]                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                      PATH  Config file path (decoupled from    │
-│                                          data dir). Defaults to              │
-│                                          <data-dir>/config.toml              │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --help                                   Show this message and exit.         │
-│ --json                     -j            Output as JSON                      │
-│ --log-level                -l      TEXT  [default: WARNING]                  │
-│ --mnemonic-file            -f      PATH  [env var: MNEMONIC_FILE]            │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│ --wallet-fingerprint               TEXT  Select the per-wallet bond registry │
-│                                          by its 8-char hex BIP32 master      │
-│                                          fingerprint. Use this instead of    │
-│                                          --mnemonic-file when you already    │
-│                                          know the fingerprint (e.g. from     │
-│                                          'jm-wallet info'). When neither is  │
-│                                          provided and exactly one wallet has │
-│                                          a registry in the data directory,   │
-│                                          that wallet is selected             │
-│                                          automatically.                      │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --json                     -j              Output as JSON                    │
+│ --log-level                -l      <str>   [default: WARNING]                │
+│ --mnemonic-file            -f      <path>  [env var: MNEMONIC_FILE]          │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│ --wallet-fingerprint               <str>   Select the per-wallet bond        │
+│                                            registry by its 8-char hex BIP32  │
+│                                            master fingerprint. Use this      │
+│                                            instead of --mnemonic-file when   │
+│                                            you already know the fingerprint  │
+│                                            (e.g. from 'jm-wallet info').     │
+│                                            When neither is provided and      │
+│                                            exactly one wallet has a registry │
+│                                            in the data directory, that       │
+│                                            wallet is selected automatically. │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1184,40 +1214,39 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  docs/technical/wallet-scanning.md.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                      PATH     Config file path (decoupled from │
-│                                             data dir). Defaults to           │
-│                                             <data-dir>/config.toml           │
-│                                             [env var:                        │
-│                                             JOINMARKET_CONFIG_FILE]          │
-│ --data-dir                         PATH     Data directory (default:         │
-│                                             ~/.joinmarket-ng or              │
-│                                             $JOINMARKET_DATA_DIR)            │
-│                                             [env var: JOINMARKET_DATA_DIR]   │
-│ --help                                      Show this message and exit.      │
-│ --log-level                -l      TEXT     Log level                        │
-│ --mnemonic-file            -f      PATH     Path to mnemonic file            │
-│                                             [env var: MNEMONIC_FILE]         │
-│ --network                  -n      TEXT     Bitcoin network                  │
-│ --prompt-bip39-passphrase                   Prompt for BIP39 passphrase      │
-│                                             interactively                    │
-│ --rpc-url                          TEXT     [env var: BITCOIN_RPC_URL]       │
-│ --scan-depth                       INTEGER  Widen the descriptor             │
-│                                             address-index range to N per     │
-│                                             branch before rescanning         │
-│                                             (re-imports descriptors). Use    │
-│                                             this once for a wallet whose     │
-│                                             used addresses sit beyond the    │
-│                                             configured .scan_range. See the  │
-│                                             wallet scanning docs.            │
-│ --start-height                     INTEGER  Block height to rescan from      │
-│                                             (default: 0 = genesis). The      │
-│                                             wallet's recorded creation       │
-│                                             height is used as a floor when   │
-│                                             available, so values below it    │
-│                                             are clamped up automatically.    │
-│                                             Honored both on its own and      │
-│                                             together with --scan-depth.      │
-│                                             [default: 0]                     │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  Path to mnemonic file             │
+│                                            [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>   Bitcoin network                   │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│                                            interactively                     │
+│ --rpc-url                          <str>   [env var: BITCOIN_RPC_URL]        │
+│ --scan-depth                       <int>   Widen the descriptor              │
+│                                            address-index range to N per      │
+│                                            branch before rescanning          │
+│                                            (re-imports descriptors). Use     │
+│                                            this once for a wallet whose used │
+│                                            addresses sit beyond the          │
+│                                            configured .scan_range. See the   │
+│                                            wallet scanning docs.             │
+│ --start-height                     <int>   Block height to rescan from       │
+│                                            (default: 0 = genesis). The       │
+│                                            wallet's recorded creation height │
+│                                            is used as a floor when           │
+│                                            available, so values below it are │
+│                                            clamped up automatically. Honored │
+│                                            both on its own and together with │
+│                                            --scan-depth.                     │
+│                                            [default: 0]                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1228,27 +1257,27 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet send [OPTIONS] DESTINATION
+ Usage: jm-wallet send [OPTIONS] {destination}
 
  Send a simple transaction from wallet to an address.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│ *    destination      TEXT  [required]                                       │
+│ *    destination      <str>  Destination address [required]                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
 │ --allow-conflicts                                     Allow replacement of   │
 │                                                       named wallet inputs    │
 │                                                       spent by a mempool     │
 │                                                       transaction            │
-│ --amount               -a                    INTEGER  Amount in sats (0 for  │
+│ --amount               -a                    <int>    Amount in sats (0 for  │
 │                                                       sweep; with            │
 │                                                       --select-utxos,        │
 │                                                       defaults to sweep)     │
 │                                                       [default: 0]           │
-│ --backend              -b                    TEXT     Backend:               │
+│ --backend              -b                    <str>    Backend:               │
 │                                                       descriptor_wallet |    │
 │                                                       neutrino               │
-│ --block-target                               INTEGER  Target blocks for fee  │
+│ --block-target                               <int>    Target blocks for fee  │
 │                                                       estimation (1-1008).   │
 │                                                       Defaults to 3.         │
 │ --broadcast                --no-broadcast             Broadcast the          │
@@ -1256,19 +1285,19 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       --no-broadcast to      │
 │                                                       skip)                  │
 │                                                       [default: broadcast]   │
-│ --config-file                                PATH     Config file path       │
+│ --config-file                                <path>   Config file path       │
 │                                                       (decoupled from data   │
 │                                                       dir). Defaults to      │
 │                                                       <data-dir>/config.toml │
 │                                                       [env var:              │
 │                                                       JOINMARKET_CONFIG_FIL… │
-│ --data-dir                                   PATH     Data directory         │
+│ --data-dir                                   <path>   Data directory         │
 │                                                       (default:              │
 │                                                       ~/.joinmarket-ng or    │
 │                                                       $JOINMARKET_DATA_DIR)  │
 │                                                       [env var:              │
 │                                                       JOINMARKET_DATA_DIR]   │
-│ --fee-rate                                   FLOAT    Manual fee rate in     │
+│ --fee-rate                                   <float>  Manual fee rate in     │
 │                                                       sat/vB (e.g. 1.5).     │
 │                                                       Mutually exclusive     │
 │                                                       with --block-target.   │
@@ -1276,7 +1305,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       estimation.            │
 │ --help                                                Show this message and  │
 │                                                       exit.                  │
-│ --input-utxo                                 TEXT     Explicit input UTXO as │
+│ --input-utxo                                 <str>    Explicit input UTXO as │
 │                                                       txid:vout              │
 │                                                       (repeatable). Spends   │
 │                                                       exactly the given      │
@@ -1288,8 +1317,8 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       --mixdepth. Mutually   │
 │                                                       exclusive with         │
 │                                                       --select-utxos.        │
-│ --log-level            -l                    TEXT     Log level              │
-│ --mixdepth             -m                    INTEGER  Source mixdepth.       │
+│ --log-level            -l                    <str>    Log level              │
+│ --mixdepth             -m                    <int>    Source mixdepth.       │
 │                                                       Fixed-amount automatic │
 │                                                       sends use the highest  │
 │                                                       funded mixdepth unless │
@@ -1300,10 +1329,10 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       it is derived from the │
 │                                                       selection unless set   │
 │                                                       explicitly.            │
-│ --mnemonic-file        -f                    PATH     [env var:              │
+│ --mnemonic-file        -f                    <path>   [env var:              │
 │                                                       MNEMONIC_FILE]         │
-│ --network              -n                    TEXT     Bitcoin network        │
-│ --neutrino-url                               TEXT     [env var:              │
+│ --network              -n                    <str>    Bitcoin network        │
+│ --neutrino-url                               <str>    [env var:              │
 │                                                       NEUTRINO_URL]          │
 │ --prompt-bip39-passp…                                 Prompt for BIP39       │
 │                                                       passphrase             │
@@ -1311,7 +1340,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       replace-by-fee         │
 │                                                       (enabled by default)   │
 │                                                       [default: rbf]         │
-│ --rpc-url                                    TEXT     [env var:              │
+│ --rpc-url                                    <str>    [env var:              │
 │                                                       BITCOIN_RPC_URL]       │
 │ --select-utxos         -s                             Interactively select   │
 │                                                       UTXOs (fzf-like TUI)   │
@@ -1342,23 +1371,26 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  - The password is required when the mnemonic file is encrypted.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│    --help                                      Show this message and exit.   │
-│ *  --mnemonic-file  -f                   PATH  Path to the mnemonic file     │
-│                                                [env var: MNEMONIC_FILE]      │
-│                                                [required]                    │
-│    --numbered           --no-numbered          Print each seed word on its   │
-│                                                own line, prefixed with its   │
-│                                                index.                        │
-│                                                [default: numbered]           │
-│    --password       -p                   TEXT  Password for an encrypted     │
-│                                                mnemonic file. If not given,  │
-│                                                the MNEMONIC_PASSWORD env var │
-│                                                is used, otherwise an         │
-│                                                interactive prompt is shown.  │
-│                                                [env var: MNEMONIC_PASSWORD]  │
-│    --yes            -y                         Skip the interactive 'Are you │
-│                                                sure?' confirmation. Use with │
-│                                                care.                         │
+│    --help                                        Show this message and exit. │
+│ *  --mnemonic-file  -f                   <path>  Path to the mnemonic file   │
+│                                                  [env var: MNEMONIC_FILE]    │
+│                                                  [required]                  │
+│    --numbered           --no-numbered            Print each seed word on its │
+│                                                  own line, prefixed with its │
+│                                                  index.                      │
+│                                                  [default: numbered]         │
+│    --password       -p                   <str>   Password for an encrypted   │
+│                                                  mnemonic file. If not       │
+│                                                  given, the                  │
+│                                                  MNEMONIC_PASSWORD env var   │
+│                                                  is used, otherwise an       │
+│                                                  interactive prompt is       │
+│                                                  shown.                      │
+│                                                  [env var:                   │
+│                                                  MNEMONIC_PASSWORD]          │
+│    --yes            -y                           Skip the interactive 'Are   │
+│                                                  you sure?' confirmation.    │
+│                                                  Use with care.              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1369,7 +1401,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet sign-psbt [OPTIONS] [PSBT_BASE64]
+ Usage: jm-wallet sign-psbt [OPTIONS] [psbt_base64]
 
  Inspect and partially sign wallet-owned native SegWit PSBT inputs offline.
 
@@ -1379,15 +1411,15 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  v0 and v2. The command never connects to a backend or broadcasts.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│   psbt_base64      [PSBT_BASE64]                                             │
+│   psbt_base64      <str>  Base64-encoded PSBT v0 or v2                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --config-file                   PATH                  Config file path       │
+│ --config-file                   <path>                Config file path       │
 │                                                       (default:              │
 │                                                       <data-dir>/config.tom… │
 │                                                       [env var:              │
 │                                                       JOINMARKET_CONFIG_FIL… │
-│ --data-dir                      PATH                  Data directory         │
+│ --data-dir                      <path>                Data directory         │
 │                                                       (default:              │
 │                                                       ~/.joinmarket-ng or    │
 │                                                       $JOINMARKET_DATA_DIR)  │
@@ -1395,18 +1427,18 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       JOINMARKET_DATA_DIR]   │
 │ --help                                                Show this message and  │
 │                                                       exit.                  │
-│ --input                 -i      PATH                  Read a binary or       │
+│ --input                 -i      <path>                Read a binary or       │
 │                                                       base64 PSBT from a     │
 │                                                       file                   │
-│ --log-level             -l      TEXT                  Log level              │
-│ --mnemonic-file         -f      PATH                  [env var:              │
+│ --log-level             -l      <str>                 Log level              │
+│ --mnemonic-file         -f      <path>                [env var:              │
 │                                                       MNEMONIC_FILE]         │
-│ --network               -n      TEXT                  Bitcoin network        │
-│ --output                -o      PATH                  Write the signed       │
+│ --network               -n      <str>                 Bitcoin network        │
+│ --output                -o      <path>                Write the signed       │
 │                                                       base64 PSBT to a file  │
 │ --prompt-bip39-passph…                                Prompt for BIP39       │
 │                                                       passphrase             │
-│ --scan-range                    INTEGER RANGE         Fallback addresses per │
+│ --scan-range                    <int range>           Fallback addresses per │
 │                                 [0<=x<=1000000]       branch to derive when  │
 │                                                       PSBT key origins are   │
 │                                                       absent                 │
@@ -1422,7 +1454,7 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 
 ```
 
- Usage: jm-wallet spend-bond [OPTIONS] BOND_ADDRESS DESTINATION
+ Usage: jm-wallet spend-bond [OPTIONS] {bond_address} {destination}
 
  Generate a PSBT to spend a cold storage fidelity bond after locktime expires.
 
@@ -1466,15 +1498,15 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  NOTE: Sparrow Wallet also cannot sign CLTV timelock scripts.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
-│ *    bond_address      TEXT  [required]                                      │
-│ *    destination       TEXT  [required]                                      │
+│ *    bond_address      <str>  Bond P2WSH address to spend [required]         │
+│ *    destination       <str>  Destination address for the funds [required]   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --data-dir                    PATH     Data directory (default:              │
+│ --data-dir                    <path>   Data directory (default:              │
 │                                        ~/.joinmarket-ng or                   │
 │                                        $JOINMARKET_DATA_DIR)                 │
 │                                        [env var: JOINMARKET_DATA_DIR]        │
-│ --derivation-path     -p      TEXT     BIP32 derivation path of the key used │
+│ --derivation-path     -p      <str>    BIP32 derivation path of the key used │
 │                                        for the bond (e.g.                    │
 │                                        "m/84'/0'/0'/0/0"). This is the path  │
 │                                        of the address whose pubkey was used  │
@@ -1482,25 +1514,25 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                        Sparrow: Addresses tab -> right-click │
 │                                        the address -> Copy -> Derivation     │
 │                                        Path.                                 │
-│ --fee-rate            -f      FLOAT    Fee rate in sat/vB [default: 1.0]     │
+│ --fee-rate            -f      <float>  Fee rate in sat/vB [default: 1.0]     │
 │ --help                                 Show this message and exit.           │
-│ --log-level           -l      TEXT     [default: INFO]                       │
-│ --master-fingerprint  -m      TEXT     Master key fingerprint (4 bytes hex,  │
+│ --log-level           -l      <str>    [default: INFO]                       │
+│ --master-fingerprint  -m      <str>    Master key fingerprint (4 bytes hex,  │
 │                                        e.g. 'aabbccdd'). Found in Sparrow:   │
 │                                        Settings -> Keystore -> Master        │
 │                                        fingerprint. Enables Sparrow and HWI  │
 │                                        to identify the signing key.          │
-│ --output              -o      PATH     Save PSBT to file (default: stdout    │
+│ --output              -o      <path>   Save PSBT to file (default: stdout    │
 │                                        only)                                 │
 │ --test-unfunded                        Allow generating a test PSBT even     │
 │                                        when the bond is unfunded, using a    │
 │                                        synthetic UTXO for signer             │
 │                                        compatibility testing.                │
-│ --test-utxo-value             INTEGER  Synthetic UTXO value in sats when     │
+│ --test-utxo-value             <int>    Synthetic UTXO value in sats when     │
 │                                        using --test-unfunded (default:       │
 │                                        100000).                              │
 │                                        [default: 100000]                     │
-│ --wallet-fingerprint          TEXT     8-char hex master key fingerprint of  │
+│ --wallet-fingerprint          <str>    8-char hex master key fingerprint of  │
 │                                        the JoinMarket wallet that will       │
 │                                        operate this bond. Run 'jm-wallet     │
 │                                        info --mnemonic-file <wallet>' on the │
@@ -1530,23 +1562,23 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  bonds whose addresses are not yet in the registry.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --backend                  -b      TEXT  Backend: descriptor_wallet |        │
-│                                          neutrino                            │
-│ --config-file                      PATH  Config file path (decoupled from    │
-│                                          data dir). Defaults to              │
-│                                          <data-dir>/config.toml              │
-│                                          [env var: JOINMARKET_CONFIG_FILE]   │
-│ --data-dir                         PATH  Data directory (default:            │
-│                                          ~/.joinmarket-ng or                 │
-│                                          $JOINMARKET_DATA_DIR)               │
-│                                          [env var: JOINMARKET_DATA_DIR]      │
-│ --help                                   Show this message and exit.         │
-│ --log-level                -l      TEXT  Log level                           │
-│ --mnemonic-file            -f      PATH  [env var: MNEMONIC_FILE]            │
-│ --network                  -n      TEXT  Bitcoin network                     │
-│ --neutrino-url                     TEXT  [env var: NEUTRINO_URL]             │
-│ --prompt-bip39-passphrase                Prompt for BIP39 passphrase         │
-│ --rpc-url                          TEXT  [env var: BITCOIN_RPC_URL]          │
+│ --backend                  -b      <str>   Backend: descriptor_wallet |      │
+│                                            neutrino                          │
+│ --config-file                      <path>  Config file path (decoupled from  │
+│                                            data dir). Defaults to            │
+│                                            <data-dir>/config.toml            │
+│                                            [env var: JOINMARKET_CONFIG_FILE] │
+│ --data-dir                         <path>  Data directory (default:          │
+│                                            ~/.joinmarket-ng or               │
+│                                            $JOINMARKET_DATA_DIR)             │
+│                                            [env var: JOINMARKET_DATA_DIR]    │
+│ --help                                     Show this message and exit.       │
+│ --log-level                -l      <str>   Log level                         │
+│ --mnemonic-file            -f      <path>  [env var: MNEMONIC_FILE]          │
+│ --network                  -n      <str>   Bitcoin network                   │
+│ --neutrino-url                     <str>   [env var: NEUTRINO_URL]           │
+│ --prompt-bip39-passphrase                  Prompt for BIP39 passphrase       │
+│ --rpc-url                          <str>   [env var: BITCOIN_RPC_URL]        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1565,9 +1597,9 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  or enter it interactively when prompted.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --help                         Show this message and exit.                   │
-│ --mnemonic-file  -f      PATH  Path to mnemonic file                         │
-│                                [env var: MNEMONIC_FILE]                      │
+│ --help                           Show this message and exit.                 │
+│ --mnemonic-file  -f      <path>  Path to mnemonic file                       │
+│                                  [env var: MNEMONIC_FILE]                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
@@ -1587,18 +1619,19 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
  storing it in config.toml. No mnemonic content is printed.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│    --help                                    Show this message and exit.     │
-│ *  --mnemonic-file  -f                 PATH  Path to encrypted mnemonic file │
-│                                              [env var: MNEMONIC_FILE]        │
-│                                              [required]                      │
-│    --password       -p                 TEXT  Password to verify. If not      │
-│                                              provided, read from             │
-│                                              MNEMONIC_PASSWORD env or        │
-│                                              prompt.                         │
-│                                              [env var: MNEMONIC_PASSWORD]    │
-│    --prompt             --no-prompt          Prompt for password if not      │
-│                                              provided via flag/env.          │
-│                                              [default: prompt]               │
+│    --help                                      Show this message and exit.   │
+│ *  --mnemonic-file  -f                 <path>  Path to encrypted mnemonic    │
+│                                                file                          │
+│                                                [env var: MNEMONIC_FILE]      │
+│                                                [required]                    │
+│    --password       -p                 <str>   Password to verify. If not    │
+│                                                provided, read from           │
+│                                                MNEMONIC_PASSWORD env or      │
+│                                                prompt.                       │
+│                                                [env var: MNEMONIC_PASSWORD]  │
+│    --prompt             --no-prompt            Prompt for password if not    │
+│                                                provided via flag/env.        │
+│                                                [default: prompt]             │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 

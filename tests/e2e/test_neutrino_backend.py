@@ -1151,10 +1151,10 @@ class TestNeutrinoFidelityBonds:
         import uuid
 
         from jmcore.timenumber import timenumber_to_timestamp
-        from mnemonic import Mnemonic
-
         from jmwallet.wallet.address import script_to_p2wsh_address
         from jmwallet.wallet.bond_registry import load_registry
+        from mnemonic import Mnemonic
+
         from tests.e2e.rpc_utils import mine_blocks
 
         mnemonic = Mnemonic("english").generate(strength=128)

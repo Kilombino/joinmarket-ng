@@ -136,7 +136,7 @@ def _path_to_string(indices: list[int]) -> str:
 class _TxInput:
     """Minimal transaction input representation."""
 
-    __slots__ = ("txid_le", "vout", "scriptsig", "sequence")
+    __slots__ = ("scriptsig", "sequence", "txid_le", "vout")
 
     def __init__(
         self,
@@ -154,7 +154,7 @@ class _TxInput:
 class _TxOutput:
     """Minimal transaction output representation."""
 
-    __slots__ = ("value", "script")
+    __slots__ = ("script", "value")
 
     def __init__(self, value: int, script: bytes) -> None:
         self.value = value
@@ -164,7 +164,7 @@ class _TxOutput:
 class _ParsedTx:
     """Minimal parsed transaction."""
 
-    __slots__ = ("version", "inputs", "outputs", "witnesses", "locktime")
+    __slots__ = ("inputs", "locktime", "outputs", "version", "witnesses")
 
     def __init__(
         self,
@@ -933,7 +933,7 @@ def main() -> None:
         sys.exit(1)
 
     # Clear mnemonic from memory (best-effort in Python)
-    mnemonic = "x" * len(mnemonic)  # noqa: F841
+    mnemonic = "x" * len(mnemonic)
     del mnemonic
 
     # The canonical witness script, not optional PSBT metadata, identifies the signing key.
@@ -964,7 +964,7 @@ def main() -> None:
         sys.exit(1)
     finally:
         # Clear key material
-        privkey_bytes = b"\x00" * 32  # noqa: F841
+        privkey_bytes = b"\x00" * 32
         del privkey_bytes
 
     # Output the signed transaction

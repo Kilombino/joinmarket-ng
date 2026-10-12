@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from finalize_bond_psbt import (  # noqa: E402
+from finalize_bond_psbt import (
     _encode_varint,
     _extract_freeze_script_pubkey,
     _parse_der_signature,
