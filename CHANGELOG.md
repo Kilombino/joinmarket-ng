@@ -7,6 +7,145 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-10-12
+
+Updated maker coin selection algorithms (no more UTXO bloat), BIP39 passphrase support in the TUI and jmwalletd, a new --version option for all commands, and several bug fixes and security hardening improvements.
+
+### Added
+
+- Add --version to all JoinMarket NG commands ([a5d27457](../../commit/a5d27457fc6baf8b6e1cee469cbf22a6ab74b022))
+- Unlock BIP39 passphrase wallets in the TUI, with the wallet fingerprint shown for confirmation and in the main menu. ([5eb181a9](../../commit/5eb181a981856c08b9d5a0a08ae71353336beae0))
+- The maker service started from the TUI also receives the BIP39 passphrase. ([5eb181a9](../../commit/5eb181a981856c08b9d5a0a08ae71353336beae0))
+- The TUI can save the BIP39 passphrase in config.toml when selecting a wallet or starting the maker, after you confirm the wallet fingerprint. ([1e0fb695](../../commit/1e0fb69569ae0b4d2271f5b90f7d8b8f061492bd))
+- Remove a saved BIP39 passphrase from the TUI Config Center. ([b8b6128d](../../commit/b8b6128d1d08a8fe8d7ae2f28818520ff58b6923))
+- BIP39 passphrase prompts are opt-in through `[wallet] bip39_passphrase_enabled` (off by default), so wallets without a passphrase see no new questions. ([17551b40](../../commit/17551b40895648e012de0a51b921e3d5e4542683))
+- With prompting enabled, commands stop before any wallet activity when no passphrase is supplied and no terminal is available to ask for one. ([17551b40](../../commit/17551b40895648e012de0a51b921e3d5e4542683))
+- Turn BIP39 passphrase prompting on or off from the TUI Config Center (Configure BIP39 Onboarding). ([906c8855](../../commit/906c88558dd0eefffb420745fbed3a604509bf42))
+- The TUI shows seed words only after fully unlocking and checking the selected wallet. ([a891b574](../../commit/a891b574e1651fa1abc53884e239e5980f6b8ac6))
+- Remember each wallet's fingerprint and whether it needs a BIP39 passphrase (never the passphrase itself), so a mistyped passphrase is rejected instead of silently opening an empty wallet. ([2a272211](../../commit/2a272211b182e7b1e81db2a9c6606d08ae1c9420))
+- `history`, `list-bonds`, and `registry-show` read a confirmed wallet without unlocking it, and honor an explicitly supplied BIP39 passphrase. ([2a272211](../../commit/2a272211b182e7b1e81db2a9c6606d08ae1c9420))
+- jmwalletd (JAM backend) users need no action: existing wallets open as before, without migration or rescanning. The daemon log only notes that their identity is unconfirmed. ([116745ef](../../commit/116745efa4ef46fb7f2ea0c1e256eea5ce271371))
+- Create, recover, and unlock jmwalletd wallets with an optional BIP39 passphrase. Clients must send it on every unlock, and wallets created with one cannot be opened by older daemon versions. ([116745ef](../../commit/116745efa4ef46fb7f2ea0c1e256eea5ce271371))
+- Makers now limit UTXO growth automatically by occasionally adding an extra input during normal CoinJoins, more often as the wallet holds more coins. Existing configurations keep working; no action needed. ([d2372871](../../commit/d2372871f7c41ab36814d18e475960361cb21d1a))
+- Add the `greediest` merge algorithm and align `gradual`, `greedy`, and `random` coin selection with the reference implementation. ([d2372871](../../commit/d2372871f7c41ab36814d18e475960361cb21d1a))
+- A wallet confirmed as needing a BIP39 passphrase always asks for it, even with passphrase prompting disabled. ([7df64022](../../commit/7df640220b4eb8cb46474d07ecfa204724248591))
+- The maker service started from the TUI only runs the wallet whose fingerprint was staged with its credentials. Existing maker setups need no action. ([7df64022](../../commit/7df640220b4eb8cb46474d07ecfa204724248591))
+
+### Fixed
+
+- Identify address-history RPC failures in ordinary logs without exposing private error details ([96e7e181](../../commit/96e7e181f8f8395cc0524882350d4e0b43c40f72))
+- Validate send destinations before prompting for wallet secrets ([a6c48b37](../../commit/a6c48b37f8e8f444bbf58d14667e8fdb9ef7982b))
+- Remove jm-maker generate-address; use jm-wallet address new instead ([d2610fbe](../../commit/d2610fbee45eb0715cc5392bb2cd388c18bd6205))
+- Warn that imported-wallet history recovery is not yet verified ([d2af11a5](../../commit/d2af11a547d8bf65671387109ec97fcc29809ec9))
+- Reject known address reuse in generated outputs before signing ([53bec10f](../../commit/53bec10f404e6132bb90d0120ff0425ae3263f8f))
+- Allow sub-1 sat/vB CoinJoins by default when local fee policy permits, with an option to ignore fee estimation ([0a3c1808](../../commit/0a3c1808c568a3d93241eb983728f99febe1455c))
+- Make the TUI follow global logging by default and clarify when log-level changes take effect ([33c31565](../../commit/33c315655a6b9a3295e0df5d19a1be5588e7b4ba))
+- Wallet settings written by the TUI no longer end up below the next section's comment banner in config.toml. ([5bc9045f](../../commit/5bc9045f584f6b30d5534495692360c6543dcd00))
+- A BIP39 passphrase staged for the maker service is tied to its wallet fingerprint, so switching the active wallet can never start the maker on the wrong wallet. ([c65717d9](../../commit/c65717d95f4792d51f9a15229a6e1603025cef77))
+- Close a brief window where the maker env file holding the wallet password could be world-readable before chmod ([c9b46c23](../../commit/c9b46c23aaf8307410e9c9a077d6ef12575d9124))
+- Protect maker wallet passwords when replacing existing environment files ([af0e608a](../../commit/af0e608ad6d9f7f3a8b6d86acc15ba0ff10c190a))
+- Wallet passwords and BIP39 passphrases containing newlines are kept intact when the TUI unlocks the wallet or stages the maker service. ([bfd72d42](../../commit/bfd72d4206db2f0a58aa3c2cb7b085998fc4cc19))
+- The jm-ng TUI runs with its own installation instead of an outdated default virtual environment, and its Update option no longer upgrades a different installation than the one running. If you have several installations, see "Multiple Installations" in the update guide. ([6af8048f](../../commit/6af8048f82c5fabdb7a0e6719f7bb4c18e7f7cfe))
+- Upgrading needs no action: on first unlock, a wallet matching the fingerprint recorded by the previous release is confirmed automatically, with or without a BIP39 passphrase. Otherwise commands keep working with a warning until you run `jm-wallet identity register`. ([971567ef](../../commit/971567ef64cb75ec8997629331d5e7479cbff4c6))
+- Fix jm-wallet info basic view showing wrong per-mixdepth ([544488ee](../../commit/544488ee01fa1855d3fc89d54f67007b9c6d08dc))
+- TUI update confirmations (running-maker warning and final confirm) now default to "No" ([074f0249](../../commit/074f02497260e0139a43ff64959ad3ec3dc30428))
+- Default the TUI Confirm Send dialog to No so a stray Enter aborts the transaction instead of broadcasting it ([6058c59c](../../commit/6058c59ca582e857ca232a3d905a150f07e5f37b))
+- Correct pending taker CoinJoin outputs displayed as change ([75001ab5](../../commit/75001ab5f36f9cc32fd41c15f035ce5ba4f8be18))
+- Fix wallet import follow-up commands and address derivation when OpenSSL lacks RIPEMD160 ([5fea1a3b](../../commit/5fea1a3b9209eb4122a9cfe3ccbe59bed6db96d7))
+- Remove the stray DEBUG process hardening line printed by every CLI command ([0bc72f57](../../commit/0bc72f57095f45c2a4de3d8bd477fd29f72a398f))
+
+### Configuration Changes
+
+Existing `config.toml` files are not updated automatically. Review the bundled template changes below and apply the relevant options manually.
+
+````diff
+--- config.toml.template (0.40.0)
++++ config.toml.template (0.41.0)
+@@ -258,6 +258,10 @@ [wallet]
+
+ # Mnemonic file settings (optional defaults)
+ # mnemonic_file = ""            # Path to mnemonic file
++# Enable BIP39 onboarding and prompting for unregistered wallets. Default: false.
++# Registered passphrase wallets still require their passphrase when this is false.
++# Recorded history uses the selected identity without unlocking either credential.
++# bip39_passphrase_enabled = false
+ #
+ # SECURITY WARNING: mnemonic_password is stored IN PLAIN TEXT in this file.
+ # Anyone who can read config.toml can decrypt the wallet, which defeats the
+@@ -265,6 +269,18 @@ [wallet]
+ # and you trust the security of this machine. Prefer leaving it unset and
+ # entering the password interactively when prompted by jm-wallet / jm-maker.
+ # mnemonic_password = ""        # Password for encrypted mnemonic (plaintext!)
++#
++# SECURITY WARNING: bip39_passphrase is stored IN PLAIN TEXT in this file.
++# Anyone who can read config.toml can derive your wallet together with your
++# seed backup. Only set it when you need unattended maker operation with a
++# passphrase-protected wallet and you trust the security of this machine.
++# Prefer leaving it unset and entering the passphrase interactively when
++# prompted by jm-wallet / jm-maker.
++# bip39_passphrase = ""         # BIP39 passphrase for the mnemonic (plaintext!)
++#
++# Compatibility: wallet_with_passphrase is accepted as an input alias for
++# bip39_passphrase_enabled. Keep one spelling per source; conflicts within one
++# source are rejected. Normal CLI/environment/config precedence applies across aliases.
+
+ # ============================================================================
+ # Logging Settings
+@@ -372,10 +388,14 @@ [maker]
+ # value may make jm-ng makers fingerprintable).
+ # min_size = 100000
+
+-# Do not sign CoinJoins below this miner fee floor. Full-node makers combine
+-# this with the local mempool minimum and a conservative estimate; Neutrino
+-# makers cannot verify foreign prevout values and therefore cannot enforce it.
+-# min_fee_rate_sat_vb = 1.0
++# Full-node makers reject CoinJoins below the highest available fee floor:
++# an optional static floor, the local mempool minimum, and a block-target estimate.
++# The static floor is disabled by default (0). Set min_fee_block_target = -1
++# to skip estimation, including the backend's fallback when estimation fails.
++# The local mempool minimum remains enforced. With no available source and no
++# static floor, no positive minimum is imposed. Neutrino makers cannot verify
++# foreign prevout values and therefore cannot enforce this policy.
++# min_fee_rate_sat_vb = 0.0
+ # min_fee_block_target = 10
+
+ # IMPORTANT: offer_type determines which fee setting is used.
+@@ -427,7 +447,18 @@ [maker]
+ # gated by taker_utxo_age (default 5).
+ # min_confirmations = 1
+
+-# UTXO merge algorithm: "default", "gradual", "greedy", "random"
++# Maker UTXO selection: "default", "gradual", "greedy", "greediest", "random".
++# default: smallest sufficient coin, otherwise largest-first. With probability
++# (n-2)/n, top up to three inputs using randomly selected extras (n > 2 eligible
++# coins in the authorized source pool). Funding already needing >=3 is unchanged.
++# gradual/greedy/greediest: reference-style smallest-first policies, respectively
++# pruned subtarget prefix, pruned prefix favoring small coins, unpruned subtarget
++# prefix. Neither greedy nor greediest means spending every eligible coin.
++# random: shuffle until funded, randomly prune unnecessary inputs, then shuffle
++# disclosure order. This does not guarantee consolidation or a five-input limit.
++# Extra inputs reveal more co-owned coins to the taker and increase its mining
++# fees. Randomization and consolidation do not guarantee privacy. All policies
++# preserve frozen/bond exclusions, confirmations, locks, and md0 restrictions.
+ # merge_algorithm = "default"
+
+ # Source mixdepth selection policy:
+@@ -680,9 +711,11 @@ [tui]
+ # ============================================================================
+
+ [tui]
+-# Log level for CLI output inside the TUI.
+-# "WARNING" = only errors and warnings (default, clean output)
++# Optional log level override for CLI commands launched inside the TUI.
++# By default, follow [logging] level (INFO when unset).
++# "WARNING" = only errors and warnings (clean output)
+ # "INFO"    = show progress messages (e.g. "Connecting to directory servers...")
+ # "DEBUG"   = verbose output for troubleshooting
+ # Can be overridden per session: LOGGING__LEVEL=INFO jm-ng
++# Changes apply to subsequently launched commands, not already-running makers.
+ # log_level = "WARNING"
+````
+
 ## [0.40.0] - 2026-09-27
 
 ### Added
@@ -4277,7 +4416,8 @@ This release did not change the bundled `config.toml.template`.
 - Pre-built image support for directory server compose.
 - Tor configuration instructions.
 
-[Unreleased]: ../../compare/0.40.0...HEAD
+[Unreleased]: ../../compare/0.41.0...HEAD
+[0.41.0]: ../../compare/0.40.0...0.41.0
 [0.40.0]: ../../compare/0.39.2...0.40.0
 [0.39.2]: ../../compare/0.39.1...0.39.2
 [0.39.1]: ../../compare/0.39.0...0.39.1
