@@ -85,6 +85,14 @@ Components: `jmcore` (Lib), `directory_server`, `jmwallet`, `maker`, `taker`, `o
   - Focus on high-level concepts over implementation details.
   - Don't use more than 3 levels of headings.
 - Component-specific READMEs for setup and usage.
+- Treat `config.toml.template` as the canonical reference for configurable settings and their
+  current defaults. Document straightforward options there with short comments; do not duplicate
+  exact defaults in documentation prose, tables, or README option inventories.
+- Keep component READMEs concise: setup, usage, essential behavior, and safety guidance. Refer to
+  the config template or CLI help instead of explaining every option or internal timing detail.
+- Preserve deliberate examples, fixed protocol constants, security and recovery warnings, and
+  generated CLI reference blocks when removing redundant documentation. Less is more, but not
+  at the expense of safe operation.
 - For docs-only fixes (typos/wording/example paths), do not add dedicated tests unless runtime behavior changes.
 
 ## References
