@@ -37,9 +37,9 @@ confirmation status without expiring pending entries; `history` displays the
 recorded status without querying the backend.
 
 Background monitoring has configurable limits. Makers use `pending_tx_timeout_min`
-(default 60 minutes) for attempts without a recorded TXID and
-`pending_tx_abandon_hours` (default 72 hours) for recorded transactions. Takers use
-their `pending_tx_abandon_hours` setting (default 24 hours). A deadline stops
+for attempts without a recorded TXID and `pending_tx_abandon_hours` for recorded
+transactions. Takers use their `pending_tx_abandon_hours` setting. See the `[maker]`
+and `[taker]` sections of `config.toml.template`. A deadline stops
 automatic checks and records `[TIMED OUT]` in CLI history. This is a local
 monitoring outcome: it does not invalidate the transaction, abandon it in
 Bitcoin Core, or release its inputs. Existing input reservation limits still apply.
@@ -68,7 +68,7 @@ jm-wallet send DESTINATION --amount AMOUNT_SATS --mixdepth MIXDEPTH
 This is a direct transaction, not a CoinJoin. Use `jm-taker coinjoin` for a
 CoinJoin, after configuring the taker and reviewing `jm-taker coinjoin --help`.
 The [taker guide](README-taker.md) covers that workflow. Taker input eligibility
-is separate from ordinary sends: its default five-confirmation PoDLE policy is
+is separate from ordinary sends: its PoDLE eligibility policy is
 not a universal spendability limit for `jm-wallet send`.
 
 ### Coin Control

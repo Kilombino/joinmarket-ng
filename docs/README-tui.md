@@ -124,7 +124,7 @@ and signer-compatibility checks.
 
 ## Logging
 
-The menu follows `[logging] level` by default (INFO when unset). An explicit
+The menu follows `[logging] level` unless overridden. An explicit
 `[tui] log_level` overrides it for commands launched by the menu; use WARNING
 for quiet output or DEBUG for troubleshooting. An initial `LOGGING__LEVEL`
 environment variable takes precedence at startup.

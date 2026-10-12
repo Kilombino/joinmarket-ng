@@ -189,7 +189,7 @@ individual selected input can be removed while preserving funding. It always
 retains at least one authentication input from a nonempty selection. It does not
 guarantee the minimum input count,
 uniform probabilities over funded subsets, consolidation, or a five-input cap.
-NG takers default to at most 15 inputs per maker and may reject larger selections;
+NG takers can cap inputs per maker through `max_maker_utxos` and reject larger selections;
 that rejection occurs after the maker has disclosed the selected outpoints.
 
 ```bash
@@ -371,7 +371,7 @@ tracker (`mempool_enabled: true` on `/v1/status`).
 |--------|----------------------|---------------------------------|
 | `SELF` | Broadcast via own backend, verify via mempool, then confirmation | Broadcast via own backend (always verifiable on chain) |
 | `RANDOM_PEER` | Try makers sequentially, verify via mempool, fall back to self | Forced to all-makers fan-out (see below) |
-| `MULTIPLE_PEERS` | Broadcast to N makers simultaneously (default), verify via mempool | Forced to all-makers fan-out |
+| `MULTIPLE_PEERS` | Broadcast to N makers simultaneously, verify via mempool | Forced to all-makers fan-out |
 | `NOT_SELF` | Try makers only, verify via mempool, no fallback | Forced to all-makers fan-out, no fallback |
 
 When mempool access is unavailable (legacy server, or operator opt-out
@@ -391,12 +391,8 @@ mempool UTXOs.
 
 ### Periodic Wallet Rescan
 
-Both maker and taker support periodic rescanning:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `rescan_interval_sec` | 600 | How often to rescan |
-| `post_coinjoin_rescan_delay` | 60 | Delay after CoinJoin (maker) |
+Both maker and taker support periodic rescanning. See `rescan_interval_sec` in the
+`[maker]` and `[taker]` sections of `config.toml.template`.
 
 **Maker:** After CoinJoin, rescans to detect balance changes and update offers automatically.
 The configured `offer_reannounce_delay_max` privacy delay applies to both public

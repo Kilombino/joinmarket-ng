@@ -72,9 +72,7 @@ transaction confirming. Full-node makers reject underpriced CoinJoins before
 signing to reduce the risk of delayed confirmation and tied-up inputs.
 
 The required rate is the highest of the local mempool minimum, the backend's
-estimate for `min_fee_block_target` (default 10), and an optional static
-`min_fee_rate_sat_vb` floor. The static floor defaults to `0` (disabled), so
-sub-1 sat/vB transactions can be accepted when local policy and estimates allow.
+estimate for `min_fee_block_target`, and any configured `min_fee_rate_sat_vb` floor.
 Set `[maker] min_fee_block_target = -1` to ignore estimation, while retaining
 the mempool minimum and any explicit static floor.
 
@@ -84,15 +82,14 @@ If no positive source is available and the static floor is disabled, no positive
 minimum is imposed. This does not guarantee relay or confirmation. Neutrino
 makers cannot verify foreign prevouts and do not enforce this fee policy.
 
-Upgrading preserves explicit configured floors, including `1.0`. Omitted or
-commented floors adopt the new `0` default on restart. No configuration or wallet
-data migration is performed. DEBUG logs identify the resolved floor and its source.
+Explicit configured floors are preserved; omitted floors follow the current
+configuration default on restart. DEBUG logs identify the resolved floor and its source.
 
 ## Direct Connections and Identity Rotation
 
 With automatically created Tor onion services, identity rotation prepares a new
 onion address on a randomly assigned local listening port. The initial listener
-uses `onion_serving_port` (normally 5222); replacement listeners can log a different
+uses `onion_serving_port`; replacement listeners can log a different
 local port. Peers continue to use the configured onion port because Tor forwards
 it to the replacement listener's actual port. Standalone Tor must reach that local
 address; in Docker, `tor_target_host` must identify the maker container.
@@ -104,74 +101,24 @@ announces its replacement identity. If the replacement cannot connect to a
 directory, the maker restores the old listener on its previous port. Static onion
 services do not rotate.
 
-Upgrading applies the listener lifecycle fix when the maker restarts. Existing
-configuration, wallet data, and Tor settings require no migration.
-
 ## Directory Connections
 
-Startup connects to configured directories concurrently and starts serving once a
-directory is ready. Slow or unreachable endpoints cannot hold up a healthy connection
-and accumulate incoming requests into a burst. Unfinished connection attempts are
-closed; the background reconnect task fills in missing directories. It first runs
-after a 60-second settling delay plus `directory_reconnect_interval` (normally five
-minutes). Subsequent passes use that interval.
-
-`directory_startup_timeout` bounds the initial connection attempts and retries as a
-whole. If none succeed, the maker still starts and relies on background reconnection.
-Tor connection failures and reconnect delays are separate from orderbook response
-limits.
-
-Orderbook responses are sent to connected directories concurrently. Each directory
-has five seconds to flush a complete response, including all offers. This bounds
-local write backpressure; it does not wait for a reply from the taker. A timed-out
-connection is aborted and recovered through the same background reconnect task.
-Healthy directories can receive responses while another directory's write is stalled.
-Severe congestion can trigger this disconnect even if the directory is otherwise
-reachable. The response budget is unchanged, and failed sends are not queued or retried.
+Makers connect to directories concurrently and reconnect unavailable endpoints in
+the background. Orderbook responses are sent independently, so a stalled directory
+does not block healthy connections. Timed-out connections are closed and recovered
+through background reconnection; failed responses are not queued or retried.
 
 ## Orderbook Rate Limits
 
-Makers limit `!orderbook` responses to keep unsolicited requests from exhausting
-signing and network resources. These limits apply with or without a fidelity bond.
+Makers apply per-peer cooldowns and independent maker-wide response budgets for
+directory and direct requests, with or without a fidelity bond. One admission covers
+all offers and, for directory requests, all connected directory sends. Suppressed
+responses are dropped, not queued; capacity replenishes automatically without
+interrupting existing CoinJoins. Sustained suppression can affect offer discovery,
+and higher limits permit more signing and network load under spam.
 
-- Directory requests normally allow one response per requester nick every 10 seconds.
-  The first copy from each additional configured directory during that cooldown
-  is ignored without adding a spam violation. Further copies from the same directory
-  still count as violations. The fanout exemption does not apply during escalated
-  backoff or a ban, and it does not extend the cooldown.
-- Direct connections have their own per-connection cooldown, normally 30 seconds.
-- Directory responses have a maker-wide budget of 200 requests per burst,
-  replenished continuously at 20 requests per second.
-- Direct responses have an independent maker-wide budget of 20 requests per burst,
-  replenished continuously at two requests per second. Exhausting either transport's
-  budget does not consume the other transport's capacity.
-- One admission covers all of that maker's offers and, for directory requests, all
-  connected directory sends. It is not charged per offer or per directory.
-  These budgets are configurable independently of per-peer `orderbook_*` limits;
-  see the `[maker]` section in `config.toml.template`.
-
-`Suppressing !orderbook response (directory response budget exhausted; refills automatically)`
-means a response was dropped, not queued. No restart is needed to replenish capacity.
-A later request can succeed once capacity is available and its separate per-peer or
-per-connection cooldown has elapsed. Existing CoinJoin sessions are not aborted by
-this limit, but sustained suppression can prevent new takers from discovering offers.
-These limits bound response admissions, not network-wide traffic or service fairness:
-multiple identities can still compete for one transport's budget, and response work
-increases with the number of offers and connected directories.
-
-Upgrading from the shared 20-request, one-per-second budget automatically applies
-the new independent limits when the maker restarts. No configuration or wallet-state
-migration is needed.
-
-Directory suppression warnings and direct-path debug messages are each throttled to
-once every 10 seconds; they do not count every dropped response. An aggregate
-`Orderbook response admission since startup` INFO message is emitted after the first
-10 minutes and hourly afterward when there has been activity. It includes elapsed
-time, admitted and globally suppressed requests for each transport, and ignored
-directory fanout copies, without peer identifiers. The counters are cumulative;
-compare successive summaries to assess sustained pressure. Admissions are work
-attempts, not confirmation of successful delivery. Persistent warnings or growing
-suppression counts warrant investigation before changing rate-limit policy.
+See the `[maker]` section in `config.toml.template` for rate-limit and directory
+connection settings.
 
 ## Receiving Addresses
 

@@ -129,10 +129,10 @@ Broadcast policies (configurable):
 |--------|----------|
 | `SELF` | Broadcast via own backend |
 | `RANDOM_PEER` | Try makers sequentially, fall back to self |
-| `MULTIPLE_PEERS` | Broadcast to N random makers (default 3), fall back to self |
+| `MULTIPLE_PEERS` | Broadcast to N random makers, fall back to self |
 | `NOT_SELF` | Try makers only, no fallback |
 
-Default is `MULTIPLE_PEERS` for redundancy.
+See `tx_broadcast` and `broadcast_peer_count` in `config.toml.template`.
 
 ### Direct vs Relay Connections
 
@@ -144,7 +144,7 @@ JoinMarket supports two routing modes:
 - Bypasses directory for private messages
 - Better privacy (directory doesn't see message metadata)
 - Lower latency after initial connection
-- Default behavior (`prefer_direct_connections=True`)
+- Controlled by `prefer_direct_connections`
 
 **Directory Relay (Fallback):**
 
@@ -201,16 +201,15 @@ This enables:
 - Reference orderbook watcher requests offers once at startup
 - Our implementation requests on startup + periodically
 - Makers respond to `!orderbook` subject to per-peer and aggregate resource limits.
-  JoinMarket NG gives directory responses a 200-request burst budget, refilling at
-  20 requests per second, and direct responses an independent 20-request burst budget,
-  refilling at two requests per second. Each admission covers all offers and the
+  Directory and direct responses have independent, configurable budgets that
+  replenish continuously. Each admission covers all offers and the
   applicable directory sends. Within the normal per-nick cooldown, the first copy
   from each additional configured directory is suppressed without a spam violation.
   Requests dropped by either aggregate budget are not queued for retry.
 
 **Stale Offer Filtering:**
 
-- Offers older than `max_offer_age` (default 1 hour) are filtered
+- Offers older than the configured `max_offer_age` are filtered
 - Maker disconnects are tracked for filtering
 
 **Known Directory Servers:**
@@ -232,22 +231,22 @@ After collecting offers, the taker selects makers through three phases:
 
 | Algorithm | Behavior |
 |-----------|----------|
-| `fidelity_bond_weighted` (default) | Per-slot coin flip: each slot independently picks bonded (weighted) or uniformly from zero-fee offers based on `bondless_makers_allowance` |
+| `fidelity_bond_weighted` | Per-slot coin flip: each slot independently picks bonded (weighted) or uniformly from zero-fee offers based on `bondless_makers_allowance` |
 | `cheapest` | Lowest fee first |
 | `weighted` | Exponentially weighted by inverse fee |
 | `random` | Uniform random selection |
 
 **Fidelity bond selection details** (`fidelity_bond_weighted`):
 
-The default algorithm uses a per-slot Bernoulli trial (matching the reference JoinMarket implementation):
+This algorithm uses a per-slot Bernoulli trial (matching the reference JoinMarket implementation):
 
-1. **Pre-filter**: When `bondless_require_zero_fee` is enabled (default), bondless offers (no fidelity bond) that advertise a non-zero CoinJoin fee, absolute or relative, are removed. This prevents attackers from flooding the orderbook with fee-charging bondless offers.
+1. **Pre-filter**: When `bondless_require_zero_fee` is enabled, bondless offers (no fidelity bond) that advertise a non-zero CoinJoin fee, absolute or relative, are removed. This prevents attackers from flooding the orderbook with fee-charging bondless offers.
 2. **Per-slot selection**: For each of the `n` slots independently:
-   - With probability `bondless_makers_allowance` (default 0.05): pick uniformly at random from the **zero-fee** offers (bonded and bondless compete equally).
+   - With probability `bondless_makers_allowance`: pick uniformly at random from the **zero-fee** offers (bonded and bondless compete equally).
    - Otherwise: pick from the bonded pool weighted by `fidelity_bond_value`.
 3. **Fallback**: If the chosen pool is empty, the other pool is tried.
 
-This design reserves about 5% of slots for uniform zero-fee selection while keeping fidelity bonds as the primary Sybil defense. Bonded makers may still charge fees and compete for the weighted slots. Set `bondless_require_zero_fee = false` to restore uniform selection from all offers for allowance slots and permit fee-charging bondless offers.
+This design reserves a configurable share of slots for uniform zero-fee selection while keeping fidelity bonds as the primary Sybil defense. Bonded makers may still charge fees and compete for the weighted slots. Set `bondless_require_zero_fee = false` to restore uniform selection from all offers for allowance slots and permit fee-charging bondless offers. See `config.toml.template` for selection settings.
 
 **Key Point**: Selection probability is proportional to the **maker identity (nick)**, not the number of offers. A maker with 5 offers has the same selection probability as a maker with 1 offer (assuming both pass filters).
 
@@ -255,7 +254,7 @@ This design reserves about 5% of slots for uniform zero-fee selection while keep
 
 When makers fail to respond, the taker can automatically select replacements instead of aborting:
 
-- Configuration: `max_maker_replacement_attempts` (default: 3, range: 0-10)
+- Configuration: `max_maker_replacement_attempts`
 - Failed makers added to ignored list for the session
 - New makers go through the full fill/auth flow
 - Auth-stage replacements use one fresh PoDLE commitment after a revelation

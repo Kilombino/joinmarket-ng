@@ -11,11 +11,11 @@ they are the source of most "missing balance" confusion.
 chain (external/internal), Core watches a fixed range of address indices,
 `[0, scan_range - 1]`. A coin received on an index beyond that range is
 invisible until the range is widened. This is controlled by
-`[wallet].scan_range` (default 1000).
+`[wallet].scan_range`.
 
 **Time coverage (which blocks Core has scanned).** Even within the watched
 index range, Core only knows about transactions in the blocks it has
-actually scanned. A fresh import scans roughly the last year (smart scan)
+actually scanned. A fresh import scans the configured smart-scan lookback
 and then catches up in the background. A coin in an older, unscanned block
 is invisible until those blocks are scanned. This requires the relevant block
 data to be available; see [pruning and assumeUTXO limitations](#pruned-nodes-and-assumeutxo).
@@ -28,11 +28,13 @@ one.
 
 ### The three settings
 
-| Setting | Default | Meaning |
-|---------|---------|---------|
-| `scan_range` | 1000 | Initial address-index range imported per branch. Auto-expands as addresses are used. |
-| `gap_limit` | 20 | BIP44 trailing-empty threshold: how many empty addresses to keep ahead of the highest used one (also the auto-expansion buffer). |
-| `scan_lookback_blocks` | 52560 | How far back the initial smart scan looks (~1 year). A background full rescan follows. |
+| Setting | Meaning |
+|---------|---------|
+| `scan_range` | Initial address-index range imported per branch. Auto-expands as addresses are used. |
+| `gap_limit` | BIP44 trailing-empty threshold: how many empty addresses to keep ahead of the highest used one (also the auto-expansion buffer). |
+| `scan_lookback_blocks` | How far back the initial smart scan looks. A background full rescan follows. |
+
+See `config.toml.template` under `[wallet]` for current values.
 
 `scan_range` is about index coverage; `gap_limit` decides when that range
 grows; `scan_lookback_blocks` is about initial time coverage. For normal
@@ -59,7 +61,7 @@ is needed or that a previous scan failed. No completion marker is filled in
 automatically. This can occur with wallets created or imported before recovery
 metadata was introduced.
 
-A regular history scan, including the default roughly one-year smart scan or a
+A regular history scan, including a smart scan with the configured lookback or a
 full block rescan, does not by itself prove that all 960 fidelity-bond addresses
 were searched. Routine bond synchronization covers only registered bonds. Explicit
 `jm-wallet recover-bonds` derives all 960 addresses and, with Bitcoin Core, scans

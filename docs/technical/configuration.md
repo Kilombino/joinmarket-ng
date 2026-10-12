@@ -128,10 +128,10 @@ socks_port = 9050
 
 ## Logging
 
-`[logging].level` controls verbosity (default: `"INFO"`). The separate
+`[logging].level` controls verbosity. The separate
 `sensitive` option includes privacy-sensitive diagnostics such as wallet
 addresses, mixdepth balances, selected UTXOs, transaction IDs, descriptors, and
-detailed errors. It defaults to `false`, including at `DEBUG` and `TRACE` levels.
+detailed errors. These details require explicit opt-in, even at `DEBUG` and `TRACE` levels.
 To include these details while troubleshooting, set:
 
 ```toml
@@ -152,7 +152,7 @@ variable values. Keep these logs private and review them before sharing excerpts
 
 ## Wallet BIP39 Onboarding
 
-`[wallet].bip39_passphrase_enabled` defaults to `false`. It controls advanced
+`[wallet].bip39_passphrase_enabled` controls advanced
 onboarding and prompting for unregistered or unknown identities, not the
 requirements of a registered wallet. A selected passphrase-required identity
 still requires its passphrase when this preference is disabled. A selected
@@ -177,9 +177,9 @@ For service staging and upgrade/restaging requirements, see
 
 ## Wallet History Reconstruction
 
-`[wallet].reconstruct_history` defaults to `true`. When a wallet with no local
-protocol history is imported from seed, JoinMarket NG defers while a Bitcoin
-Core rescan is active, then enumerates confirmed wallet transactions on the
+With `[wallet].reconstruct_history` enabled, JoinMarket NG reconstructs imported
+wallets without local protocol history. It defers while a Bitcoin Core rescan is
+active, then enumerates confirmed wallet transactions on the
 next wallet sync and persists guessed `maker`, `taker`, `send`, and `deposit`
 rows in `history.csv`.
 These rows have `source=onchain`; live protocol rows have `source=protocol` and
@@ -233,7 +233,7 @@ This identity binds signed nick ownership proofs to the directory endpoint selec
 client. If it is absent, the directory does not advertise or perform nick authentication, leaving
 nicks unverified. `test:` identities are only for local and automated test deployments.
 
-`nick_auth_mode` defaults to `prefer_verified`, which authenticates capable clients while
+`nick_auth_mode = "prefer_verified"` authenticates capable clients while
 retaining compatibility with legacy clients. Set it to `require_verified` to reject clients that
 do not support nick authentication. Setting it to `disabled` intentionally turns off the
 protection.
@@ -242,12 +242,13 @@ protection.
 
 The `[directory_server]` section supports heartbeat liveness controls:
 
-- `heartbeat_sweep_interval` (default `60.0`): seconds between sweep cycles
-- `heartbeat_idle_threshold` (default `600.0`): idle seconds before probing
-- `heartbeat_hard_evict` (default `1500.0`): idle seconds before unconditional eviction
-- `heartbeat_pong_wait` (default `30.0`): seconds to wait for PONG reply
+- `heartbeat_sweep_interval`: seconds between sweep cycles
+- `heartbeat_idle_threshold`: idle seconds before probing
+- `heartbeat_hard_evict`: idle seconds before unconditional eviction
+- `heartbeat_pong_wait`: seconds to wait for PONG reply
 
-These values are tuned to match joinmarket-rs defaults for interoperability.
+See `config.toml.template` for current values, tuned for interoperability with
+joinmarket-rs.
 
 ## Notes
 

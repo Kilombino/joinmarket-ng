@@ -109,9 +109,9 @@ for the required block availability and recovery coverage.
 
 A displayed balance is not necessarily spendable for the proposed CoinJoin.
 Check the source mixdepth, frozen coins, confirmations, amount, and fees.
-By default the taker proof needs a UTXO with at least five confirmations and
-at least 20% of the CoinJoin amount. Repeated authentication attempts can also
-use up the available proofs for a coin. Read the reported reason before retrying;
+The taker proof needs a UTXO meeting the configured confirmation and value
+requirements; see `config.toml.template` under `[taker]`. Repeated authentication
+attempts can also use up the available proofs for a coin. Read the reported reason before retrying;
 do not lower proof requirements as a workaround.
 
 ## CoinJoin Failed Or Stopped

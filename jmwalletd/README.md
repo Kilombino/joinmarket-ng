@@ -35,11 +35,8 @@ Start the daemon:
 jmwalletd
 ```
 
-Defaults:
-
-- bind host: `127.0.0.1`
-- port: `28183`
-- TLS: enabled with an auto-generated self-signed cert in `~/.joinmarket-ng/ssl/`
+See `jmwalletd --help` for listener and TLS options. Auto-generated TLS certificates
+are self-signed.
 
 Common options:
 
@@ -90,16 +87,12 @@ and takes precedence over `[POLICY] tx_fees` for that request only; omit it or
 send `0` to use the configured value, and note that a value beyond the money
 supply is rejected rather than falling back to it. On the neutrino
 backend, block-target estimation uses the external fee source configured via
-`bitcoin.fee_estimate_url` (an onion-first fallback chain over Tor by default).
+`bitcoin.fee_estimate_url`.
 Multiple comma-separated URLs are tried in order. When external estimation is
 disabled and no Tor proxy is available, set a sat/kvB value instead. External
-estimates remain subject to `wallet.max_fee_rate_sat_vb` (default 1000 sat/vB).
+estimates remain subject to `wallet.max_fee_rate_sat_vb`.
 
-Orderbook proxy target resolution is:
-
-1. `OBWATCH_URL` env var
-2. `orderbook_watcher.http_host` + `orderbook_watcher.http_port`
-3. fallback `http://127.0.0.1:8000`
+Set `OBWATCH_URL` to override the configured orderbook watcher endpoint.
 
 ## Development
 

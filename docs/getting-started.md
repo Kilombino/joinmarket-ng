@@ -57,8 +57,8 @@ jm-wallet info
 ```
 
 Wait for the deposit to appear and confirm. The displayed balance can include
-coins that are not yet eligible for a CoinJoin. The default taker proof requires
-an eligible UTXO with at least five confirmations; a newly confirmed deposit
+coins that are not yet eligible for a CoinJoin. CoinJoin proof eligibility requires
+sufficient confirmations; a newly confirmed deposit
 may still be too young. For missing funds, [check sync first](troubleshooting.md#missing-balance-or-slow-sync).
 
 ## 5. Choose Your Next Task

@@ -80,7 +80,8 @@ funds; backups and mnemonic hygiene are out of scope here and live in
       identities; takers weight maker selection by bond value. See
       [Privacy: Fidelity Bonds](privacy.md).
     - **Bondless-zero-fee policy.** Bondless offers with a non-zero
-      absolute or relative fee are filtered out by default. A 5% allowance
+      absolute or relative fee are filtered out when `bondless_require_zero_fee`
+      is enabled. A configurable allowance
       selects uniformly only among zero-fee offers, while the remaining slots
       retain fidelity-bond weighting ([Protocol](protocol.md)).
     - **Feature stats over bonded makers only** in the orderbook watcher

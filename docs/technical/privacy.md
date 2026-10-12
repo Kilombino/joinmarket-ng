@@ -113,18 +113,14 @@ compressed and uncompressed encodings of `G`, the one-byte index, and a counter
 until the result encodes a valid curve point. The implementation and vectors
 live in `jmcore/src/jmcore/podle.py`.
 
-One UTXO can produce commitments with multiple NUMS indices:
-
-- index 0 is the first use,
-- indices 1 and 2 cover normal retries,
-- higher indices require a maker configured with a larger
-  `taker_utxo_retries` allowance.
+One UTXO can produce commitments with multiple NUMS indices. Makers bound reuse
+with the configured `taker_utxo_retries` allowance.
 
 Takers track used commitments in `cmtdata/commitments.json`. Makers maintain
 the relayed blacklist in `cmtdata/commitmentlist`.
 
-By default, a PoDLE UTXO needs five confirmations and value of at least 20% of
-the CoinJoin amount. Eligible coins are prioritized by confirmations and then
+PoDLE eligibility uses `taker_utxo_age` and `taker_utxo_amtpercent`; see
+`config.toml.template`. Eligible coins are prioritized by confirmations and then
 value. Automatic taker coin selection also requires at least one selected input
 to have an unused, non-blacklisted commitment index. If the normal funding
 choice is exhausted, the taker reselects with a fresh eligible UTXO and spends
@@ -135,9 +131,9 @@ set has no fresh commitment.
 ## Maker Identity Renewal
 
 A maker periodically replaces its nick, ephemeral onion service, and
-directory connections, at a random interval of 12 to 24 hours by default
-(`identity_renewal_min_sec` / `identity_renewal_max_sec`). The replacement
-offers are built fresh, so their randomized fees and maximum size differ from
+directory connections, at a randomized configured interval
+(`identity_renewal_min_sec` / `identity_renewal_max_sec`; see `config.toml.template`).
+The replacement offers are built fresh, so their randomized fees and maximum size differ from
 the previous ones.
 
 The old identity first stops accepting new direct connections, keeps its

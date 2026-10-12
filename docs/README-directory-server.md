@@ -124,12 +124,8 @@ DIRECTORY_SERVER__MESSAGE_RATE_LIMIT=100
 LOGGING__LEVEL=INFO
 ```
 
-Heartbeat liveness settings (section `[directory_server]` in `config.toml`):
-
-- `heartbeat_sweep_interval` (default `60.0`)
-- `heartbeat_idle_threshold` (default `600.0`)
-- `heartbeat_hard_evict` (default `1500.0`)
-- `heartbeat_pong_wait` (default `30.0`)
+Heartbeat liveness controls are documented in `config.toml.template` under
+`[directory_server]`.
 
 Behavior summary:
 
@@ -145,7 +141,7 @@ Nick ownership authentication settings (section `[directory_server]`):
 - Set `nick_auth_directory_id` to the canonical lowercase Tor v3 endpoint, including the port,
   for example `your56characterhostname.onion:5222`. Local tests may use an explicit `test:`
   identity, but public deployments must not.
-- `nick_auth_mode` defaults to `prefer_verified`, which authenticates upgraded clients while
+- `nick_auth_mode = "prefer_verified"` authenticates upgraded clients while
   retaining legacy client compatibility. `require_verified` rejects legacy clients, and
   `disabled` intentionally turns off this security feature.
 - `nick_auth_timeout` controls the proof deadline and cannot exceed 30 seconds.
