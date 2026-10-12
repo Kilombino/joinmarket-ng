@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import cast
 
-from bitcointx.core import CTransaction
+from bitcointx.core import CMutableTransaction, CTransaction
 from bitcointx.core.key import CKey
 from bitcointx.core.script import SIGVERSION_WITNESS_V0, CScript, SIGHASH_Type, SignatureHash
 from jmcore.bitcoin import (
@@ -75,6 +75,12 @@ def compute_sighash_segwit(
         ctx = CTransaction.deserialize(
             serialize_transaction(tx.version, tx.inputs, tx.outputs, tx.locktime)
         )
+        if ctx.nLockTime > 0x7FFFFFFF:
+            # bitcointx packs nLockTime into the BIP-143 preimage as a signed
+            # int32; its two's complement gives the same four bytes.
+            mutable = CMutableTransaction.from_tx(ctx)
+            mutable.nLockTime -= 1 << 32
+            ctx = mutable
         return bytes(
             SignatureHash(
                 CScript(script_code),
