@@ -428,3 +428,9 @@ For the local-first workflow, the manifest must come from the same release
 commit as the local tag created by `bump_version.py`. `sign-release.sh` refuses
 to sign a local manifest if its embedded `commit:` does not match the release
 tag (or `HEAD` when no local tag exists).
+
+When another signer already stored an identical manifest, the script omits a
+new signer-specific copy only after confirming the published release manifest
+has the exact signed bytes. If that check is unavailable or differs, it keeps
+the copy for compatibility with existing verifiers and saved installers.
+Existing committed manifests are not removed.

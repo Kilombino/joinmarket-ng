@@ -66,6 +66,8 @@ When signing a locally-built manifest (--manifest):
   The manifest was just generated from a local build, so reproduction is skipped
   by default. Use --reproduce to force a rebuild and verify. The embedded
   manifest commit must match your local release tag (or HEAD if no tag exists).
+  A new signer copy is omitted only if another stored manifest and the published
+  release manifest both have identical bytes. Otherwise the copy is retained.
 
 The reproduce check compares layer digests (content-addressable, format-independent)
 rather than manifest digests, ensuring reliable comparison regardless of build environment.
@@ -619,13 +621,37 @@ echo ""
 echo "Signature file: $SIG_FILE"
 echo "Installer signature file: $INSTALLER_SIG_FILE"
 
-# If using a local manifest, copy it alongside the signature for CI verification
+# Keep signer-specific manifests unless the published bytes make a new copy redundant.
 LOCAL_MANIFEST_COPY=""
 if [[ -n "$LOCAL_MANIFEST" ]]; then
-    LOCAL_MANIFEST_COPY="$SIG_DIR/${FULL_FINGERPRINT}-manifest.txt"
-    cp "$MANIFEST_FILE" "$LOCAL_MANIFEST_COPY"
-    log_info "Local manifest saved: $LOCAL_MANIFEST_COPY"
-    echo "  (CI will verify its layer digests match this manifest)"
+    signer_manifest="$SIG_DIR/${FULL_FINGERPRINT}-manifest.txt"
+    duplicate_manifest=""
+    # Never remove an existing signer copy. Older verifiers and installers need
+    # per-signer copies whenever the published manifest has different bytes.
+    if [[ ! -e "$signer_manifest" ]]; then
+        for stored_manifest in "$SIG_DIR"/*-manifest.txt; do
+            [[ -f "$stored_manifest" && "$stored_manifest" != "$signer_manifest" ]] || continue
+            if cmp -s "$MANIFEST_FILE" "$stored_manifest"; then
+                duplicate_manifest="$stored_manifest"
+                break
+            fi
+        done
+    fi
+
+    published_manifest="$WORK_DIR/published-manifest.txt"
+    manifest_url="https://github.com/${REPO}/releases/download/${VERSION}/release-manifest-${VERSION}.txt"
+    # This is only an optimization. Missing curl, unavailable CI, failed or
+    # partial downloads, and byte differences all retain the original layout.
+    if [[ -n "$duplicate_manifest" ]] && command -v curl &>/dev/null && \
+        curl -fsSL --connect-timeout 5 --max-time 15 "$manifest_url" -o "$published_manifest" 2>/dev/null && \
+        cmp -s "$MANIFEST_FILE" "$published_manifest"; then
+        log_info "Published manifest matches signed bytes; skipping duplicate local manifest copy"
+    else
+        LOCAL_MANIFEST_COPY="$signer_manifest"
+        cp "$MANIFEST_FILE" "$LOCAL_MANIFEST_COPY"
+        log_info "Local manifest saved: $LOCAL_MANIFEST_COPY"
+        echo "  (CI will verify its layer digests match this manifest)"
+    fi
 fi
 echo ""
 
