@@ -330,6 +330,8 @@
 # Set to false to keep the ID in local logs only.
 # include_coinjoin_id = true
 # include_nick = true
+# Route notification delivery through Tor. Set to false for a notification server
+# on your LAN. Update checks (below) always use Tor regardless of this setting.
 # use_tor = true
 
 # Verify TLS certificates of notification servers. Set to false when your
@@ -362,9 +364,9 @@
 
 # Update checks (opt-in, disabled by default)
 # PRIVACY WARNING: When enabled, this contacts github.com each summary interval
-# to check for new releases. The request is always routed through Tor and is skipped
-# when use_tor = false or the Tor proxy is unavailable. GitHub will still see the
-# Tor exit node IP.
+# to check for new releases. The request is always routed through Tor, even when
+# use_tor = false (which only affects notification delivery), and is skipped when
+# the Tor proxy is unavailable. GitHub will still see the Tor exit node IP.
 # check_for_updates = false
 
 # Retry failed notifications in the background (recommended for Tor)

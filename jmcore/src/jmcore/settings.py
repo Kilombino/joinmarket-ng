@@ -621,7 +621,11 @@ class NotificationSettings(BaseModel):
     )
     use_tor: bool = Field(
         default=True,
-        description="Route notifications through Tor SOCKS proxy",
+        description=(
+            "Route notification delivery through the Tor SOCKS proxy. Set to false for "
+            "a LAN notification server. Does not affect update checks, which are "
+            "always Tor-only."
+        ),
     )
     verify_tls: bool = Field(
         default=True,
@@ -678,9 +682,9 @@ class NotificationSettings(BaseModel):
         description=(
             "Check GitHub for new releases and include version info in summary notifications. "
             "PRIVACY WARNING: This contacts github.com each summary interval. "
-            "The request is always routed through Tor and is skipped when use_tor is disabled "
-            "or the Tor proxy is unavailable. GitHub will still see the Tor exit node IP. "
-            "Opt-in only."
+            "The request is always routed through Tor (independent of use_tor, which only "
+            "affects notification delivery) and is skipped when the Tor proxy is unavailable. "
+            "GitHub will still see the Tor exit node IP. Opt-in only."
         ),
     )
     # Retry settings

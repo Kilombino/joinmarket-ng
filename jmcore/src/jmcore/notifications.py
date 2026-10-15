@@ -463,17 +463,20 @@ class NotificationConfig(BaseModel):
     # Tor/Proxy settings
     use_tor: bool = Field(
         default=True,
-        description="Route notifications through Tor SOCKS proxy",
+        description=(
+            "Route notification delivery through Tor SOCKS proxy. "
+            "Update checks are always Tor-only, independent of this flag."
+        ),
     )
     tor_socks_host: str = Field(
         default="127.0.0.1",
-        description="Tor SOCKS5 proxy host (only used if use_tor=True)",
+        description="Tor SOCKS5 proxy host (used for Tor delivery and update checks)",
     )
     tor_socks_port: int = Field(
         default=9050,
         ge=1,
         le=65535,
-        description="Tor SOCKS5 proxy port (only used if use_tor=True)",
+        description="Tor SOCKS5 proxy port (used for Tor delivery and update checks)",
     )
     stream_isolation: bool = Field(
         default=True,
@@ -563,7 +566,7 @@ class NotificationConfig(BaseModel):
         description=(
             "Check GitHub for new releases and include version info in summary notifications. "
             "PRIVACY WARNING: contacts github.com through Tor each summary interval. "
-            "The check is skipped when Tor is unavailable."
+            "Always Tor-only regardless of use_tor; skipped when Tor is unavailable."
         ),
     )
 

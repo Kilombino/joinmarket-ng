@@ -2469,6 +2469,112 @@ class TestPendingConfirmationNotifications:
         notifier.notify_confirmed.assert_not_awaited()
 
 
+class TestPeriodicSummaryUpdateCheck:
+    """Update checks in the periodic summary are Tor-only, independent of use_tor.
+
+    A user with a LAN notification server (use_tor=false) must still get
+    GitHub release checks through Tor; disabling delivery Tor must never
+    cause a clearnet request or silently skip the check.
+    """
+
+    def _bot(self, tmp_path: Path) -> MakerBot:
+        wallet = MagicMock(mixdepth_count=5, utxo_cache={})
+        wallet.get_total_balance = AsyncMock(return_value=0)
+        config = MakerConfig(
+            mnemonic="test " * 12,
+            directory_servers=["localhost:5222"],
+            network=NetworkType.REGTEST,
+            data_dir=tmp_path,
+        )
+        bot = MakerBot(wallet=wallet, backend=MagicMock(), config=config)
+        bot.running = True
+        return bot
+
+    def _notifier(self, **overrides: object) -> MagicMock:
+        from jmcore.notifications import NotificationConfig
+
+        fields: dict[str, object] = {
+            "enabled": True,
+            "urls": [],
+            "notify_summary": True,
+            "notify_summary_balance": False,
+            "summary_interval_hours": 24,
+            "check_for_updates": True,
+            "tor_socks_host": "127.0.0.1",
+            "tor_socks_port": 9050,
+        }
+        fields.update(overrides)
+        config = NotificationConfig(**fields)  # type: ignore[arg-type]
+        notifier = MagicMock()
+        notifier.config = config
+        notifier.notify_summary = AsyncMock(return_value=True)
+        return notifier
+
+    async def _run_one_summary(self, bot: MakerBot, notifier: MagicMock) -> AsyncMock:
+        """Run a single summary iteration and return the patched update checker."""
+
+        calls = 0
+
+        async def sleep(_delay: float) -> None:
+            # The loop sleeps before each iteration: let the first one run
+            # and stop before the second.
+            nonlocal calls
+            calls += 1
+            if calls >= 2:
+                bot.running = False
+
+        check = AsyncMock(return_value=None)
+        stats = {
+            "total_coinjoins": 0,
+            "successful_coinjoins": 0,
+            "failed_coinjoins": 0,
+            "total_fees_earned": 0,
+            "total_volume": 0,
+            "successful_volume": 0,
+            "utxos_disclosed": 0,
+        }
+        with (
+            patch("maker.background_tasks.get_notifier", return_value=notifier),
+            patch("maker.background_tasks.asyncio.sleep", side_effect=sleep),
+            patch("jmcore.version.check_for_updates_from_github", check),
+            patch("jmwallet.history.get_history_stats_for_period", return_value=stats),
+        ):
+            await bot._periodic_summary()
+        assert calls == 2
+        return check
+
+    @pytest.mark.asyncio
+    async def test_use_tor_false_still_checks_updates_through_tor(self, tmp_path: Path) -> None:
+        """LAN delivery (use_tor=false) must not disable Tor-only update checks."""
+        notifier = self._notifier(use_tor=False, stream_isolation=False)
+        check = await self._run_one_summary(self._bot(tmp_path), notifier)
+
+        check.assert_awaited_once_with(socks_proxy="socks5h://127.0.0.1:9050")
+        notifier.notify_summary.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_use_tor_false_with_stream_isolation_uses_isolated_circuit(
+        self, tmp_path: Path
+    ) -> None:
+        from jmcore.tor_isolation import IsolationCategory, build_isolated_proxy_url
+
+        notifier = self._notifier(use_tor=False, stream_isolation=True)
+        check = await self._run_one_summary(self._bot(tmp_path), notifier)
+
+        expected = build_isolated_proxy_url("127.0.0.1", 9050, IsolationCategory.UPDATE_CHECK)
+        check.assert_awaited_once_with(socks_proxy=expected)
+        assert check.await_args is not None
+        assert check.await_args.kwargs["socks_proxy"].startswith("socks5h://")
+
+    @pytest.mark.asyncio
+    async def test_check_for_updates_false_never_contacts_github(self, tmp_path: Path) -> None:
+        notifier = self._notifier(use_tor=False, check_for_updates=False)
+        check = await self._run_one_summary(self._bot(tmp_path), notifier)
+
+        check.assert_not_awaited()
+        notifier.notify_summary.assert_awaited_once()
+
+
 class TestDirectoryReconnection:
     """Tests for directory server reconnection functionality."""
 

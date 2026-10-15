@@ -776,7 +776,10 @@ class BackgroundTasksMixin:
 
         When ``check_for_updates`` is enabled, the latest release version is
         fetched from GitHub through Tor and included in the summary notification.
-        The update check is skipped when Tor is disabled or unavailable.
+        The update check always uses the shared Tor SOCKS proxy, independent of
+        ``use_tor`` (which only controls notification delivery), so a LAN
+        notification server can coexist with Tor-only update checks. The check
+        is skipped when the Tor proxy is unavailable; no clearnet request is made.
         """
         from jmcore.version import check_for_updates_from_github, get_version
         from jmwallet.history import get_history_stats_for_period
@@ -826,24 +829,24 @@ class BackgroundTasksMixin:
                 update_available: str | None = None
                 if notifier.config.check_for_updates:
                     current_version = get_version()
-                    socks_proxy: str | None = None
-                    if notifier.config.use_tor:
-                        if notifier.config.stream_isolation:
-                            from jmcore.tor_isolation import (
-                                IsolationCategory,
-                                build_isolated_proxy_url,
-                            )
+                    # Update checks are Tor-only regardless of use_tor, which
+                    # governs notification delivery alone.
+                    if notifier.config.stream_isolation:
+                        from jmcore.tor_isolation import (
+                            IsolationCategory,
+                            build_isolated_proxy_url,
+                        )
 
-                            socks_proxy = build_isolated_proxy_url(
-                                notifier.config.tor_socks_host,
-                                notifier.config.tor_socks_port,
-                                IsolationCategory.UPDATE_CHECK,
-                            )
-                        else:
-                            socks_proxy = (
-                                f"socks5h://{notifier.config.tor_socks_host}"
-                                f":{notifier.config.tor_socks_port}"
-                            )
+                        socks_proxy = build_isolated_proxy_url(
+                            notifier.config.tor_socks_host,
+                            notifier.config.tor_socks_port,
+                            IsolationCategory.UPDATE_CHECK,
+                        )
+                    else:
+                        socks_proxy = (
+                            f"socks5h://{notifier.config.tor_socks_host}"
+                            f":{notifier.config.tor_socks_port}"
+                        )
                     result = await check_for_updates_from_github(
                         socks_proxy=socks_proxy,
                     )
