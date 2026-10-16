@@ -279,13 +279,13 @@ class TestFullViewFidelityBonds:
         assert out.index("fidelity bond addr.") < out.index("external addresses")
 
         # Own raster: fb-date column, fb-a/fb-x tags, lock/redeem states, and
-        # confirmation counts bucketed at 5+ (the lock state is the signal).
+        # exact confirmation counts.
         assert any(line.startswith("idx") and "fb-date" in line for line in out.splitlines())
         active_line = next(line for line in out.splitlines() if _BOND_ACTIVE_ADDR in line)
         expired_line = next(line for line in out.splitlines() if _BOND_EXPIRED_ADDR in line)
         assert active_line.split("|")[4].strip() == "fb-a"
         assert active_line.split("|")[5].strip() == "lock"
-        assert active_line.split("|")[3].strip() == "5+"
+        assert active_line.split("|")[3].strip() == "100"
         assert expired_line.split("|")[4].strip() == "fb-x"
         assert expired_line.split("|")[5].strip() == "redeem"
         assert expired_line.split("|")[3].strip() == "3"
@@ -315,6 +315,21 @@ class TestFullViewFidelityBonds:
         ]
         assert len(headers) == 11  # 1 bond + 5 external + 5 internal
         assert all(line.index("m/84'") == BRANCH_NAME_WIDTH + 2 for line in headers)
+
+    def test_full_view_preserves_frozen_bond_states(self, full_view_wallet_with_bonds) -> None:
+        for addr in full_view_wallet_with_bonds.get_fidelity_bond_addresses_info.return_value:
+            addr.utxos[0].frozen = True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = _invoke_info(
+                full_view_wallet_with_bonds, tmpdir, "--extended", "--view", "full"
+            )
+        assert result.exit_code == 0, result.output
+        for address, state in (
+            (_BOND_ACTIVE_ADDR, "lock frozn"),
+            (_BOND_EXPIRED_ADDR, "redeem frozn"),
+        ):
+            line = next(line for line in result.output.splitlines() if address in line)
+            assert line.split("|")[5].strip() == state
 
     def test_hidden_bonds_leave_notice_and_drop_totals(
         self, full_view_wallet_with_bonds, capsys, monkeypatch, tmp_path

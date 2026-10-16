@@ -5,7 +5,7 @@ Tests for the 'full' renderer of the extended wallet info view
 The renderer consumes the canonical row model (:mod:`jmwallet.wallet.rows`)
 and only formats it: pipe-aligned tables, one line per UTXO (hard rule), no
 elision, bare number cells with the units in the headers, exact confirmation
-counts (fidelity bonds bucketed at ``5+``), explicit ``spend`` state,
+counts, explicit ``spend`` state,
 and the red ``RU!`` marker at the end of the row for reused addresses.
 """
 
@@ -150,7 +150,7 @@ class TestBranchTable:
         assert all(line.count("|") == 6 for line in data_lines)
 
     def test_snapshot_fidelity_bond_branch(self) -> None:
-        """The bond branch adds lock/redeem state + fb-date, buckets confs at 5+."""
+        """The bond branch adds lock/redeem state + fb-date, retaining exact confs."""
         bonds = [
             _addr(
                 "bc1pbond0",
@@ -184,13 +184,43 @@ class TestBranchTable:
         assert "state" in lines[0]
         data_lines = lines[2:]
         assert all(line.count("|") == 7 for line in data_lines)
-        # confirmation counts bucketed at 5+ like the legacy UTXO child rows
-        assert [line.split("|")[3].strip() for line in data_lines] == ["5+", ""]
+        assert [line.split("|")[3].strip() for line in data_lines] == ["100", ""]
         # /-prefixed derivation index — no locktime epoch glued to a path cell
         assert [line.split("|")[0].strip() for line in data_lines] == ["/0", "/2"]
         # lock status per row: a funded active bond locks; an empty bond has
         # no state (nothing to lock or redeem)
         assert [line.split("|")[5].strip() for line in data_lines] == ["lock", ""]
+
+    @pytest.mark.parametrize("locked", [True, False])
+    @pytest.mark.parametrize("pending", [True, False])
+    @pytest.mark.parametrize("frozen", [True, False])
+    def test_bond_state_preserves_frozen_flag(
+        self, locked: bool, pending: bool, frozen: bool
+    ) -> None:
+        locktime = FB_EXPIRY if locked else NOW - 86_400
+        addr = _addr(
+            "tb1qbond",
+            0,
+            balance=5_000,
+            status="bond",
+            is_external=False,
+            is_bond=True,
+            locktime=locktime,
+            utxos=[
+                _utxo("ee" * 32, 0, 5_000, "tb1qbond", 12_345, frozen=frozen, locktime=locktime)
+            ],
+        )
+        rows = build_branch_rows(
+            [addr],
+            mixdepth=0,
+            branch=2,
+            now=NOW,
+            pending_addresses={addr.address} if pending else set(),
+        )
+        line = info_render.render_branch_table(rows, fidelity_bond=True)[2]
+        state = "pend" if pending else "lock" if locked else "redeem"
+        assert line.split("|")[5].strip() == (f"{state} frozn" if frozen else state)
+        assert line.split("|")[3].strip() == "12,345"
 
     def test_hidden_note_mentions_show_empty(self) -> None:
         hidden = HiddenRow(mixdepth=0, branch=0, hidden_count=2)

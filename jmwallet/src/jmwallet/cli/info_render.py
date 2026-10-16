@@ -23,10 +23,8 @@ not tax the ``tag`` column width.
 The fidelity bond branch adds a ``fb-date`` column — the locktime date
 (``YY-MM-DD``) qualifying the fb-a/fb-x label — after ``state``, which
 there shows the lock status (``lock``/``redeem``; a pending outgoing
-spend overrides it, and a 0-conf bond shows ``0`` under ``confs`` instead
-of an ``unconf`` state). Confirmation counts are bucketed at ``5+``
-like the legacy UTXO child rows: for a bond the lock state, not the exact
-count, is the meaningful signal.
+spend overrides it). Frozen UTXOs append ``frozn`` to that state. A 0-conf
+bond shows ``0`` under ``confs`` instead of an ``unconf`` state.
 """
 
 from __future__ import annotations
@@ -88,17 +86,16 @@ def _state_text(row: UtxoRow | AddressRow) -> str:
 
 
 def _fb_state_text(row: UtxoRow | AddressRow) -> str:
-    """Lock status for fidelity bond rows; ``pend`` takes precedence.
+    """Lock status for fidelity bond rows, retaining frozen indications.
 
     Empty bond addresses show no state (nothing to lock or redeem). A
     0-conf bond shows ``0`` under ``confs`` instead of an ``unconf``
     state.
     """
-    if row.pending:
-        return "pend"
     if isinstance(row, UtxoRow):
-        return "lock" if row.label == "fb-a" else "redeem"
-    return ""
+        state = "pend" if row.pending else "lock" if row.label == "fb-a" else "redeem"
+        return f"{state} frozn" if row.frozen else state
+    return "pend" if row.pending else ""
 
 
 def _format_row(
@@ -115,16 +112,11 @@ def _format_row(
     The units live in the table headers (``sats``/``confs``), so the cells
     carry bare numbers; the first column is the derivation index rendered as
     ``/5`` (the branch path printed once above the table plus this cell gives
-    the full derivation path). Fidelity bond confirmation
-    counts are bucketed at ``5+`` like the legacy UTXO child rows — for a
-    bond the lock state, not the exact count, is the meaningful signal.
+    the full derivation path). Confirmation counts are exact for all branches.
     """
     if isinstance(row, UtxoRow):
         amount = f"{row.utxo.value:>{num_width},}"
-        if fidelity_bond:
-            confs = "5+" if row.utxo.confirmations >= 5 else str(row.utxo.confirmations)
-        else:
-            confs = f"{row.utxo.confirmations:,}"
+        confs = f"{row.utxo.confirmations:,}"
         outpoint = row.utxo.outpoint
     else:
         amount = f"{'0':>{num_width}}"
