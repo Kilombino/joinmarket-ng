@@ -1361,12 +1361,12 @@ class TestSyncFidelityBondAddressCache:
         assert ws.get_key_for_address(address) is None
 
 
-class TestFreezeUnfreezeGuard:
-    """Tests for the fidelity-bond guard in the bulk unfreeze path.
+class TestFreezeToggleAndUnfreezeAll:
+    """Tests for freeze toggling and the bulk unfreeze path.
 
-    Fidelity bonds are managed via the dedicated bond commands, not the freeze
-    manager, so "unfreeze all" must skip *every* fidelity bond (both still-locked
-    and expired) and only unfreeze regular UTXOs.
+    Every UTXO is toggleable in the freeze manager, fidelity bonds included:
+    a frozen still-locked bond stays out of the sweep fallback and coin
+    control once its timelock expires.
     """
 
     def _utxos(self) -> list[UTXOInfo]:
@@ -1399,7 +1399,7 @@ class TestFreezeUnfreezeGuard:
                 locktime=future,
                 frozen=True,
             ),
-            # Frozen EXPIRED fidelity bond (locktime in the past) -> skip too.
+            # Frozen EXPIRED fidelity bond (locktime in the past) -> unfreeze.
             UTXOInfo(
                 txid="b" * 64,
                 vout=0,
@@ -1426,47 +1426,59 @@ class TestFreezeUnfreezeGuard:
             ),
         ]
 
-    def test_unfreeze_skips_all_bonds_but_unfreezes_regular(self) -> None:
-        from jmwallet.cli.freeze import _unfreeze_regular_utxos
+    def test_unfreeze_all_unfreezes_bonds_too(self) -> None:
+        from jmwallet.cli.freeze import _unfreeze_utxos
 
         wallet = MagicMock()
         utxos = self._utxos()
 
-        unfrozen_count, skipped_bonds = _unfreeze_regular_utxos(wallet, utxos)
+        unfrozen_count = _unfreeze_utxos(wallet, utxos)
 
-        # Only the regular frozen UTXO is unfrozen; both bonds (locked AND
-        # expired) are skipped.
-        assert unfrozen_count == 1
-        assert skipped_bonds == 2
+        # Every frozen UTXO is unfrozen, including the still-locked bond: its
+        # frozen flag is deliberate (it keeps the bond out of the sweep
+        # fallback and coin control once the timelock expires), but "unfreeze
+        # all" clears all flags alike.
+        assert unfrozen_count == 3
         unfrozen_outpoints = {call.args[0] for call in wallet.toggle_freeze_utxo.call_args_list}
-        assert unfrozen_outpoints == {utxos[0].outpoint}
-        # Neither bond was toggled.
-        assert utxos[1].outpoint not in unfrozen_outpoints
-        assert utxos[2].outpoint not in unfrozen_outpoints
+        assert unfrozen_outpoints == {utxo.outpoint for utxo in utxos[:3]}
 
-    def test_is_freeze_toggleable(self) -> None:
-        from jmwallet.cli.freeze import _is_freeze_toggleable
+    def test_toggle_expired_bond_calls_wallet_toggle(self) -> None:
+        from jmwallet.cli.freeze import _FreezeTUIState, _toggle_selected_utxo
 
-        regular, locked_bond, expired_bond, _unfrozen = self._utxos()
-        # Regular UTXO: toggleable.
-        assert _is_freeze_toggleable(regular) is True
-        # Locked fidelity bond: NOT toggleable.
-        assert locked_bond.is_locked is True
-        assert _is_freeze_toggleable(locked_bond) is False
-        # Expired fidelity bond: also NOT toggleable (managed via bond commands).
-        assert expired_bond.is_locked is False
-        assert _is_freeze_toggleable(expired_bond) is False
+        wallet = MagicMock()
+        expired_bond = self._utxos()[2]
+        state = _FreezeTUIState(cursor_pos=0)
+
+        _toggle_selected_utxo(state, [expired_bond], wallet)
+
+        wallet.toggle_freeze_utxo.assert_called_once_with(expired_bond.outpoint)
+        assert state.error_message is None
+
+    def test_toggle_locked_bond_calls_wallet_toggle(self) -> None:
+        from jmwallet.cli.freeze import _FreezeTUIState, _toggle_selected_utxo
+
+        wallet = MagicMock()
+        locked_bond = self._utxos()[1]
+        state = _FreezeTUIState(cursor_pos=0)
+
+        _toggle_selected_utxo(state, [locked_bond], wallet)
+
+        # Still-locked bonds toggle like any other UTXO: a frozen locked bond
+        # stays out of the sweep fallback and coin control once its timelock
+        # expires.
+        wallet.toggle_freeze_utxo.assert_called_once_with(locked_bond.outpoint)
+        assert state.error_message is None
 
 
 class TestFreezeCursorNavigation:
-    """Tests for freeze-TUI cursor navigation skipping bonds and separators."""
+    """Tests for freeze-TUI cursor navigation skipping mixdepth separators."""
 
     def _items(self) -> list[UTXOInfo | None]:
         from jmwallet.cli.freeze import _build_display_items
 
         # mixdepth 0: one bond only; mixdepth 1: one regular UTXO. After sorting
         # by path the bond (branch 2) sorts after any md0 regular, but here md0
-        # has *only* a bond so index 0 is a non-toggleable bond.
+        # has *only* a bond so index 0 is a (selectable) bond.
         utxos = [
             UTXOInfo(
                 txid="b" * 64,
@@ -1492,15 +1504,17 @@ class TestFreezeCursorNavigation:
         ]
         return _build_display_items(utxos)
 
-    def test_seek_skips_separators_and_bonds(self) -> None:
+    def test_seek_skips_separators_only(self) -> None:
         from jmwallet.cli.freeze import _seek_selectable
 
         items = self._items()
-        # Layout: [bond(0), None(1), regular(2)].
+        # Layout: [bond(0), None(1), regular(2)]. The bond is selectable like
+        # any UTXO, so seeking forward from it stays put; starting on the
+        # separator, seeking skips it in either direction.
         assert items[1] is None
-        # Seeking forward from 0 must skip the bond and the separator and land
-        # on the regular UTXO at index 2.
-        assert _seek_selectable(items, 0, 1) == 2
+        assert _seek_selectable(items, 0, 1) == 0
+        assert _seek_selectable(items, 1, 1) == 2
+        assert _seek_selectable(items, 1, -1) == 0
 
     def test_seek_falls_back_to_opposite_direction(self) -> None:
         from jmwallet.cli.freeze import _seek_selectable
@@ -1512,7 +1526,7 @@ class TestFreezeCursorNavigation:
         # off the end.
         assert _seek_selectable(items, last, 1) == last
 
-    def test_seek_all_bonds_returns_start(self) -> None:
+    def test_seek_single_bond_is_selectable(self) -> None:
         from jmwallet.cli.freeze import _build_display_items, _seek_selectable
 
         only_bond = _build_display_items(
@@ -1530,8 +1544,149 @@ class TestFreezeCursorNavigation:
                 )
             ]
         )
-        # No toggleable item exists; the cursor stays put at the start.
+        # The single bond is selectable like any UTXO, so the cursor stays put.
         assert _seek_selectable(only_bond, 0, 1) == 0
+
+    def test_seek_expired_bond_is_selectable(self) -> None:
+        from jmwallet.cli.freeze import _build_display_items, _seek_selectable
+
+        items = _build_display_items(
+            [
+                UTXOInfo(
+                    txid="c" * 64,
+                    vout=0,
+                    value=300_000,
+                    address="bc1qexpiredbond",
+                    confirmations=100,
+                    scriptpubkey="0020" + "44" * 32,
+                    path="m/84'/0'/0'/2/1",
+                    mixdepth=0,
+                    locktime=1,  # 1970, expired -> selectable in the freeze manager
+                ),
+                UTXOInfo(
+                    txid="a" * 64,
+                    vout=0,
+                    value=100_000,
+                    address="bc1qregular",
+                    confirmations=10,
+                    scriptpubkey="0014" + "11" * 20,
+                    path="m/84'/0'/1'/0/0",
+                    mixdepth=1,
+                ),
+            ]
+        )
+        # Layout: [expired bond(0), None(1), regular(2)]. The expired bond is
+        # selectable, so seeking from it stays put.
+        assert _seek_selectable(items, 0, 1) == 0
+
+
+class TestFreezeFooterStats:
+    """Tests for the freeze-TUI footer statistics lines.
+
+    Two lines, never mixing regular UTXOs and fidelity bonds: line 1 covers
+    non-bond UTXOs (Total | Frozen | Spendable), line 2 covers bonds
+    (Fidelity Bonds | Frozen/Locked | Spendable) and is omitted when the
+    wallet has none. On the bond line, Spendable counts expired, unfrozen
+    bonds; Frozen/Locked collects bonds that are frozen or still timelocked.
+    Each line's segments sum to that line's total.
+    """
+
+    def _utxos(self) -> list[UTXOInfo]:
+        import time
+
+        future = int(time.time()) + 10 * 365 * 24 * 3600  # ~10 years out
+        return [
+            # Frozen regular UTXO.
+            UTXOInfo(
+                txid="e" * 64,
+                vout=0,
+                value=100_000,
+                address="bc1qnormal",
+                confirmations=10,
+                scriptpubkey="0014" + "11" * 20,
+                path="m/84'/0'/0'/0/0",
+                mixdepth=0,
+                frozen=True,
+            ),
+            # Frozen LOCKED fidelity bond (locktime far in the future).
+            UTXOInfo(
+                txid="f" * 64,
+                vout=1,
+                value=500_000,
+                address="bc1qlockedbond",
+                confirmations=100,
+                scriptpubkey="0020" + "22" * 32,
+                path="m/84'/0'/0'/2/0",
+                mixdepth=0,
+                locktime=future,
+                frozen=True,
+            ),
+            # Frozen EXPIRED fidelity bond (locktime in the past).
+            UTXOInfo(
+                txid="b" * 64,
+                vout=0,
+                value=300_000,
+                address="bc1qexpiredbond",
+                confirmations=100,
+                scriptpubkey="0020" + "44" * 32,
+                path="m/84'/0'/0'/2/1",
+                mixdepth=0,
+                locktime=1,  # 1970, expired
+                frozen=True,
+            ),
+            # Unfrozen regular UTXO.
+            UTXOInfo(
+                txid="a" * 64,
+                vout=2,
+                value=50_000,
+                address="bc1qunfrozen",
+                confirmations=3,
+                scriptpubkey="0014" + "33" * 20,
+                path="m/84'/0'/0'/0/1",
+                mixdepth=0,
+                frozen=False,
+            ),
+            # Unfrozen EXPIRED fidelity bond (spendable like a regular UTXO,
+            # but reported on the separate bond line).
+            UTXOInfo(
+                txid="c" * 64,
+                vout=1,
+                value=200_000,
+                address="bc1qspendablebond",
+                confirmations=100,
+                scriptpubkey="0020" + "55" * 32,
+                path="m/84'/0'/0'/2/2",
+                mixdepth=0,
+                locktime=1,  # 1970, expired
+                frozen=False,
+            ),
+        ]
+
+    def test_footer_two_lines_separate_bonds(self) -> None:
+        from jmwallet.cli.freeze import _format_freeze_footer_stats
+
+        footer = _format_freeze_footer_stats(self._utxos())
+
+        assert footer == (
+            " Total(w/o FBs): 150,000 sats (2 UTXOs) | "
+            "Frozen: 100,000 sats (1 UTXO) | "
+            "Spendable: 50,000 sats (1 UTXO)\n"
+            " Fidelity Bonds: 1,000,000 sats (3 UTXOs) | "
+            "Frozen/Locked: 800,000 sats (2 UTXOs) | "
+            "Spendable: 200,000 sats (1 UTXO)"
+        )
+
+    def test_footer_without_bonds(self) -> None:
+        from jmwallet.cli.freeze import _format_freeze_footer_stats
+
+        footer = _format_freeze_footer_stats([self._utxos()[0], self._utxos()[3]])
+
+        # No bonds: single line, plain "Total" label.
+        assert footer == (
+            " Total: 150,000 sats (2 UTXOs) | "
+            "Frozen: 100,000 sats (1 UTXO) | "
+            "Spendable: 50,000 sats (1 UTXO)"
+        )
 
 
 # ---------------------------------------------------------------------------

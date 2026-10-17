@@ -92,10 +92,10 @@ def freeze(
     automatic coin selection (taker, maker, and sweep operations).
     Changes take effect immediately on each toggle.
 
-    Still-locked fidelity bonds are shown as [FB-LOCKED] and cannot be toggled
-    (they are already unspendable until their timelock expires). Expired
-    fidelity bonds behave like regular UTXOs: they can be frozen/unfrozen, and
-    "unfreeze all" will unfreeze them.
+    Fidelity bonds (locked or expired) can be frozen like any other UTXO:
+    freezing a still-locked bond keeps it out of the sweep fallback and coin
+    control once its timelock expires. Bonds are tagged [FB-LOCKED] or
+    [FB-EXPIRED] in the list; "freeze all"/"unfreeze all" include them.
     """
     settings = setup_cli(log_level, data_dir=data_dir, config_file=config_file)
 
@@ -288,39 +288,25 @@ def _show_freeze_status(utxos: list[UTXOInfo]) -> None:
         )
 
 
-def _is_freeze_toggleable(utxo: UTXOInfo) -> bool:
-    """Whether the user may toggle a UTXO's frozen flag in the freeze manager.
+def _unfreeze_utxos(wallet: WalletService, utxos: list[UTXOInfo]) -> int:
+    """Unfreeze every frozen UTXO, fidelity bonds included.
 
-    Fidelity bonds cannot be toggled: they are managed separately via the
-    bond commands and should not be modified in the freeze manager.
-    """
-    return not utxo.is_fidelity_bond
-
-
-def _unfreeze_regular_utxos(wallet: WalletService, utxos: list[UTXOInfo]) -> tuple[int, int]:
-    """Unfreeze every frozen regular UTXO, skipping all fidelity bonds.
-
-    Fidelity bonds (both still-locked and expired) are not managed in the
-    freeze manager; they are handled via the dedicated bond commands. So
-    "unfreeze all" only affects regular UTXOs and leaves every bond untouched,
-    regardless of its frozen flag.
+    A frozen still-locked bond is frozen deliberately: the flag keeps it out
+    of the sweep fallback and coin control once its timelock expires, so
+    "unfreeze all" clears it like any other frozen flag.
 
     Returns:
-        Tuple of (unfrozen_count, skipped_bond_count).
+        Number of UTXOs unfrozen.
     """
     unfrozen_count = 0
-    skipped_bonds = 0
 
     for utxo in utxos:
         if not utxo.frozen:
             continue
-        if not _is_freeze_toggleable(utxo):
-            skipped_bonds += 1
-            continue
         wallet.toggle_freeze_utxo(utxo.outpoint)
         unfrozen_count += 1
 
-    return unfrozen_count, skipped_bonds
+    return unfrozen_count
 
 
 # Building the display list (with mixdepth separators) is shared with the
@@ -339,9 +325,10 @@ _FREEZE_COL_HEADER = (
 def _seek_selectable(display_items: list[UTXOInfo | None], start: int, direction: int) -> int:
     """Return the nearest selectable index from ``start``.
 
-    Skips ``None`` separators and non-toggleable UTXOs (fidelity bonds).
+    Skips only ``None`` separators: every UTXO (fidelity bonds included) is
+    toggleable in the freeze manager.
     """
-    return seek_selectable(display_items, start, direction, _is_freeze_toggleable)
+    return seek_selectable(display_items, start, direction, lambda _: True)
 
 
 def _format_freeze_address(address: str, prev_address: str) -> str:
@@ -356,11 +343,16 @@ def _format_freeze_address(address: str, prev_address: str) -> str:
 
 def _build_utxo_line(utxo: UTXOInfo, prev_address: str) -> str:
     """Build the single-row text for a UTXO in the freeze TUI."""
-    # FBs show [!] to indicate special status, regular UTXOs show [F] or [ ]
-    if utxo.is_fidelity_bond:
+    # [!] highlights an unfrozen bond's special role: still-locked bonds are
+    # unspendable on-chain, and expired bonds are auto-selected by the sweep
+    # fallback and coin control. A frozen bond shows [F] like any frozen UTXO;
+    # regular UTXOs show [F] or [ ].
+    if utxo.is_fidelity_bond and not utxo.frozen:
         status = "[!]"
+    elif utxo.frozen:
+        status = "[F]"
     else:
-        status = "[F]" if utxo.frozen else "[ ]"
+        status = "[ ]"
 
     amount_str = f"{utxo.value:,} sats"
     conf_str = f"{utxo.confirmations:>8,} conf"
@@ -433,6 +425,62 @@ def _draw_utxo_rows(
             pass
 
 
+def _format_freeze_footer_stats(utxo_items: list[UTXOInfo]) -> str:
+    """Build the footer statistics lines for the freeze TUI.
+
+    Two lines, newline-separated; regular UTXOs and fidelity bonds are
+    never mixed. Line 1 covers non-bond UTXOs (Total | Frozen | Spendable)
+    and is labeled ``Total(w/o FBs)`` when bonds exist, plain ``Total``
+    when they don't. Line 2 covers fidelity bonds and is omitted entirely
+    when the wallet has none: Spendable counts expired, unfrozen bonds
+    (the sweep fallback and coin control auto-select those), while
+    Frozen/Locked collects every bond that is frozen or still timelocked.
+    Each line's segments sum to that line's total.
+    """
+
+    def _utxo_word(count: int) -> str:
+        return "UTXOs" if count != 1 else "UTXO"
+
+    def _format_category(value: int, count: int) -> str:
+        """Format category with value and optional UTXO count in parentheses."""
+        if value == 0:
+            return f"{value:,} sats"
+        return f"{value:,} sats ({count} {_utxo_word(count)})"
+
+    def _stats(us: list[UTXOInfo]) -> tuple[int, int]:
+        return (sum(u.value for u in us), len(us))
+
+    regular = [u for u in utxo_items if not u.is_fidelity_bond]
+    bonds = [u for u in utxo_items if u.is_fidelity_bond]
+
+    total_value, total_count = _stats(regular)
+    frozen_value, frozen_count = _stats([u for u in regular if u.frozen])
+    spendable_value, spendable_count = _stats([u for u in regular if not u.frozen])
+
+    total_label = "Total(w/o FBs)" if bonds else "Total"
+    lines = [
+        f" {total_label}: {_format_category(total_value, total_count)} | "
+        f"Frozen: {_format_category(frozen_value, frozen_count)} | "
+        f"Spendable: {_format_category(spendable_value, spendable_count)}"
+    ]
+
+    if bonds:
+        fb_total_value, fb_total_count = _stats(bonds)
+        fb_unavailable_value, fb_unavailable_count = _stats(
+            [u for u in bonds if u.frozen or u.is_locked]
+        )
+        fb_spendable_value, fb_spendable_count = _stats(
+            [u for u in bonds if not u.frozen and not u.is_locked]
+        )
+        lines.append(
+            f" Fidelity Bonds: {_format_category(fb_total_value, fb_total_count)} | "
+            f"Frozen/Locked: {_format_category(fb_unavailable_value, fb_unavailable_count)} | "
+            f"Spendable: {_format_category(fb_spendable_value, fb_spendable_count)}"
+        )
+
+    return "\n".join(lines)
+
+
 def _draw_freeze_footer(
     stdscr: curses.window,
     utxo_items: list[UTXOInfo],
@@ -444,32 +492,12 @@ def _draw_freeze_footer(
     """Draw the separator, optional error line, and footer help lines."""
     import curses
 
-    def _utxo_word(count: int) -> str:
-        return "UTXOs" if count != 1 else "UTXO"
+    stats_lines = _format_freeze_footer_stats(utxo_items).split("\n")
+    legend = " Space/Tab: toggle | j/k: navigate | a: freeze all | n: unfreeze all | q: exit"
 
-    def _format_category(value: int, count: int) -> str:
-        """Format category with value and optional UTXO count in parentheses."""
-        if value == 0:
-            return f"{value:,} sats"
-        return f"{value:,} sats ({count} {_utxo_word(count)})"
-
-    # Calculate statistics
-    total_count = len(utxo_items)
-    total_value = sum(u.value for u in utxo_items)
-
-    # FBs (all fidelity bonds, both locked and expired)
-    fb_count = sum(1 for u in utxo_items if u.is_fidelity_bond)
-    fb_value = sum(u.value for u in utxo_items if u.is_fidelity_bond)
-
-    # Frozen (only non-FB UTXOs that are frozen)
-    frozen_count = sum(1 for u in utxo_items if u.frozen and not u.is_fidelity_bond)
-    frozen_value = sum(u.value for u in utxo_items if u.frozen and not u.is_fidelity_bond)
-
-    # Spendable (only non-FB UTXOs that are not frozen)
-    spendable_count = sum(1 for u in utxo_items if not u.frozen and not u.is_fidelity_bond)
-    spendable_value = sum(u.value for u in utxo_items if not u.frozen and not u.is_fidelity_bond)
-
-    stdscr.addstr(height - 4, 0, "-" * min(len(_FREEZE_COL_HEADER) + 5, width - 1))
+    # Layout grows upward from the legend: stats line(s), then the separator.
+    separator_row = height - 3 - len(stats_lines)
+    stdscr.addstr(separator_row, 0, "-" * min(len(_FREEZE_COL_HEADER) + 5, width - 1))
 
     if error_active and error_message:
         try:
@@ -479,19 +507,11 @@ def _draw_freeze_footer(
         except curses.error:
             pass
 
-    # New footer line with clear separation
-    footer1 = (
-        f" Total: {_format_category(total_value, total_count)} | "
-        f"FBs: {_format_category(fb_value, fb_count)} | "
-        f"Frozen: {_format_category(frozen_value, frozen_count)} | "
-        f"Spendable: {_format_category(spendable_value, spendable_count)}"
-    )
-    footer2 = " Space/Tab: toggle | j/k: navigate | a: freeze all | n: unfreeze all | q: exit"
-
     stdscr.attron(curses.A_BOLD)
     try:
-        stdscr.addstr(height - 3, 0, footer1[: width - 1])
-        stdscr.addstr(height - 2, 0, footer2[: width - 1])
+        for i, line in enumerate(stats_lines):
+            stdscr.addstr(separator_row + 1 + i, 0, line[: width - 1])
+        stdscr.addstr(height - 2, 0, legend[: width - 1])
     except curses.error:
         pass
     stdscr.attroff(curses.A_BOLD)
@@ -520,7 +540,10 @@ def _render_freeze_screen(
     stdscr.addstr(4, 0, "-" * min(len(_FREEZE_COL_HEADER) + 5, width - 1))
 
     list_start = 5  # Data starts here (+1 blank line under the header rule)
-    list_height = height - 6
+    # The footer needs one extra row when fidelity bonds are present (they get
+    # their own stats line; bond count cannot change during the session).
+    has_bonds = any(u is not None and u.is_fidelity_bond for u in display_items)
+    list_height = height - 7 if has_bonds else height - 6
 
     # Keep the cursor on screen.
     scroll_offset = adjust_scroll(cursor_pos, scroll_offset, list_height)
@@ -560,16 +583,13 @@ def _toggle_selected_utxo(
     if utxo is None:
         return
 
-    # Fidelity bonds (locked or expired) are managed via the bond commands,
-    # not here, so toggling their frozen flag is disallowed. Regular UTXOs
-    # toggle normally.
-    if not _is_freeze_toggleable(utxo):
-        state.set_error("Fidelity bond cannot be (un)frozen; use bond commands instead")
-    else:
-        try:
-            wallet.toggle_freeze_utxo(utxo.outpoint)
-        except OSError as e:
-            state.set_error(f"Failed to persist freeze state: {e}")
+    # Fidelity bonds toggle like any other UTXO, including still-locked ones:
+    # a frozen locked bond stays out of the sweep fallback and coin control
+    # once its timelock expires.
+    try:
+        wallet.toggle_freeze_utxo(utxo.outpoint)
+    except OSError as e:
+        state.set_error(f"Failed to persist freeze state: {e}")
 
     # Move cursor down to the next selectable item after the action.
     if state.cursor_pos < len(display_items) - 1:
@@ -579,13 +599,12 @@ def _toggle_selected_utxo(
 def _freeze_all_utxos(
     state: _FreezeTUIState, display_items: list[UTXOInfo | None], wallet: WalletService
 ) -> None:
-    """Freeze every toggleable UTXO (skipping all fidelity bonds)."""
+    """Freeze every unfrozen UTXO, fidelity bonds included."""
     try:
         for item in display_items:
-            if item is None or not _is_freeze_toggleable(item):
+            if item is None or item.frozen:
                 continue
-            if not item.frozen:
-                wallet.toggle_freeze_utxo(item.outpoint)
+            wallet.toggle_freeze_utxo(item.outpoint)
     except OSError as e:
         state.set_error(f"Failed to persist freeze state: {e}")
 
@@ -593,14 +612,10 @@ def _freeze_all_utxos(
 def _unfreeze_all_utxos(
     state: _FreezeTUIState, display_items: list[UTXOInfo | None], wallet: WalletService
 ) -> None:
-    """Unfreeze every frozen regular UTXO, reporting skipped fidelity bonds."""
+    """Unfreeze every frozen UTXO, fidelity bonds included."""
     try:
         utxo_items = [u for u in display_items if u is not None]
-        _, skipped_bonds = _unfreeze_regular_utxos(wallet, utxo_items)
-        if skipped_bonds > 0:
-            state.set_error(
-                f"Skipped {skipped_bonds} fidelity bond UTXO(s); manage them with bond commands"
-            )
+        _unfreeze_utxos(wallet, utxo_items)
     except OSError as e:
         state.set_error(f"Failed to persist freeze state: {e}")
 

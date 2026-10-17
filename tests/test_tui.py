@@ -2684,6 +2684,7 @@ def _make_freeze_utxo(
     address: str = "bc1qaddr",
     value: int = 100000,
     frozen: bool = False,
+    locktime: int | None = None,
 ) -> UTXOInfo:
     from jmwallet.wallet.models import UTXOInfo
 
@@ -2697,6 +2698,7 @@ def _make_freeze_utxo(
         confirmations=10,
         scriptpubkey="0014" + "00" * 20,
         frozen=frozen,
+        locktime=locktime,
     )
 
 
@@ -2831,6 +2833,59 @@ def test_freeze_build_utxo_line_contains_address_and_amount() -> None:
     # A second row with the same address collapses the address column.
     repeated = _build_utxo_line(utxo, prev_address="bc1qexample")
     assert "bc1qexample" not in repeated
+
+
+def test_freeze_build_utxo_line_marks_unfrozen_locked_bond_special() -> None:
+    """A still-locked fidelity bond shows [!] until it is frozen.
+
+    [!] highlights the bond's special role (unspendable on-chain until its
+    timelock expires); once the user freezes the bond, the row shows [F]
+    like any frozen UTXO. The [FB-LOCKED] suffix carries the identity.
+    """
+    from jmwallet.cli.freeze import _build_utxo_line
+
+    future = int(time.time()) + 86_400
+    unfrozen = _make_freeze_utxo(
+        "unfrozenlocked", mixdepth=0, path="m/84'/0'/0'/0/0", locktime=future
+    )
+    frozen = _make_freeze_utxo(
+        "frozenlocked", mixdepth=0, path="m/84'/0'/0'/0/1", locktime=future, frozen=True
+    )
+
+    unfrozen_line = _build_utxo_line(unfrozen, prev_address="")
+    frozen_line = _build_utxo_line(frozen, prev_address="")
+
+    assert unfrozen_line.startswith(" [!]")
+    assert "[FB-LOCKED]" in unfrozen_line
+    assert frozen_line.startswith(" [F]")
+    assert "[FB-LOCKED]" in frozen_line
+
+
+def test_freeze_build_utxo_line_marks_unfrozen_expired_bond_special() -> None:
+    """An expired fidelity bond shows [!] until it is frozen.
+
+    [!] highlights the bond's special role: expired unfrozen bonds are
+    auto-selected by the sweep fallback and coin control. Once the user
+    freezes the bond it shows [F] like any frozen UTXO; the [FB-EXPIRED]
+    suffix carries the identity.
+    """
+    from jmwallet.cli.freeze import _build_utxo_line
+
+    past = int(time.time()) - 86_400
+    unfrozen_fb = _make_freeze_utxo(
+        "unfrozenfb", mixdepth=0, path="m/84'/0'/0'/0/0", locktime=past
+    )
+    frozen_fb = _make_freeze_utxo(
+        "frozenfb", mixdepth=0, path="m/84'/0'/0'/0/1", locktime=past, frozen=True
+    )
+
+    unfrozen_line = _build_utxo_line(unfrozen_fb, prev_address="")
+    frozen_line = _build_utxo_line(frozen_fb, prev_address="")
+
+    assert unfrozen_line.startswith(" [!]")
+    assert "[FB-EXPIRED]" in unfrozen_line
+    assert frozen_line.startswith(" [F]")
+    assert "[FB-EXPIRED]" in frozen_line
 
 
 def test_tui_script_uses_portable_backup_detection() -> None:
