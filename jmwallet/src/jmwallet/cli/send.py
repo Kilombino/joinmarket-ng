@@ -35,7 +35,7 @@ from jmwallet.wallet.spend import (
 )
 
 if TYPE_CHECKING:
-    from jmwallet.backends.base import MempoolAcceptResult
+    from jmwallet.backends.base import BlockchainBackend, MempoolAcceptResult
     from jmwallet.history import TransactionHistoryEntry
     from jmwallet.wallet.models import UTXOInfo
     from jmwallet.wallet.service import WalletService
@@ -92,13 +92,13 @@ def _mempool_policy_failure_reason(result: MempoolAcceptResult) -> str:
 
 async def _select_input_utxos(
     wallet: WalletService,
-    backend_settings: ResolvedBackendSettings,
+    backend: BlockchainBackend,
     amount: int,
     mixdepth: int | None,
     interactive: bool,
     destination: str,
     fee_rate: float,
-) -> tuple[list[UTXOInfo], int] | None:
+) -> tuple[list[UTXOInfo], int, int | None] | None:
     """Pick the transaction inputs, interactively or automatically.
 
     Interactive mode shows the whole wallet in the selector for a full
@@ -107,8 +107,11 @@ async def _select_input_utxos(
     from a single mixdepth; the TUI enforces this).
 
     Returns:
-        ``(utxos, source_mixdepth)``, or ``None`` when the user cancelled
-        the interactive selection.
+        ``(utxos, source_mixdepth, locktime_cutoff)``, or ``None`` when the
+        user cancelled the interactive selection. ``locktime_cutoff`` is
+        the chain median-time-past when the sweep fallback selected expired
+        fidelity bonds (needed for the transaction locktime), else
+        ``None``.
 
     Raises:
         typer.Exit: When no (spendable) UTXOs are available or the selector
@@ -149,7 +152,7 @@ async def _select_input_utxos(
             return None
         mixdepth = selected_utxos[0].mixdepth
         logger.info(f"Selected {len(selected_utxos)} UTXOs from mixdepth {mixdepth}")
-        return selected_utxos, mixdepth
+        return selected_utxos, mixdepth, None
 
     if amount > 0:
         from jmwallet.wallet.spend import select_automatic_direct_send_inputs
@@ -167,7 +170,7 @@ async def _select_input_utxos(
             logger.bind(sensitive=True).error(str(exc))
             raise typer.Exit(1) from exc
         logger.info(f"Selected {len(selection.utxos)} UTXO(s) from mixdepth {selected_mixdepth}")
-        return selection.utxos, selected_mixdepth
+        return selection.utxos, selected_mixdepth, None
 
     if mixdepth is None:
         logger.error("--mixdepth is required when sweeping (--amount 0)")
@@ -181,33 +184,27 @@ async def _select_input_utxos(
         logger.error("No UTXOs available")
         raise typer.Exit(1)
 
-    # Auto-selection: filter out frozen and fidelity bond UTXOs
-    # (frozen UTXOs must never be auto-spent; fidelity bonds must be
-    # explicitly selected via interactive mode)
-    locked_outpoints = {(txid.lower(), vout) for txid, vout in wallet.get_locked_input_outpoints()}
-    blocked_regular_scripts = {
-        utxo.scriptpubkey
-        for utxo in utxos
-        if not utxo.is_fidelity_bond and (utxo.txid, utxo.vout) in locked_outpoints
-    }
-    spendable = [
-        utxo
-        for utxo in utxos
-        if not utxo.frozen
-        and not utxo.is_fidelity_bond
-        and (utxo.txid, utxo.vout) not in locked_outpoints
-        and utxo.scriptpubkey not in blocked_regular_scripts
-    ]
-    frozen_count = len(utxos) - len(spendable)
-    if frozen_count > 0:
+    # Auto-selection: frozen UTXOs must never be auto-spent; fidelity bonds
+    # join the sweep only as a fallback when no regular coins qualify
+    # (expired-bond redemption: freeze everything else, then sweep).
+    from jmwallet.wallet.spend import select_sweep_input_utxos
+
+    spendable, locktime_cutoff = await select_sweep_input_utxos(wallet, backend, utxos)
+    excluded_count = len(utxos) - len(spendable)
+    if excluded_count > 0:
         logger.info(
-            f"Excluding {frozen_count} frozen, fidelity-bond, or CoinJoin-locked UTXO(s) "
+            f"Excluding {excluded_count} frozen, fidelity-bond, or CoinJoin-locked UTXO(s) "
             "from auto-selection"
         )
     if not spendable:
         logger.error("No spendable UTXOs available (all UTXOs are frozen or fidelity bonds)")
         raise typer.Exit(1)
-    return spendable, mixdepth
+    if locktime_cutoff is not None:
+        logger.info(
+            f"No regular spendable UTXOs in mixdepth {mixdepth}; sweeping "
+            f"{len(spendable)} expired fidelity bond(s)"
+        )
+    return spendable, mixdepth, locktime_cutoff
 
 
 @app.command(no_args_is_help=True)
@@ -597,7 +594,7 @@ async def _send_transaction(
         else:
             selection = await _select_input_utxos(
                 wallet,
-                backend_settings,
+                backend,
                 amount,
                 mixdepth,
                 interactive_utxo_selection,
@@ -606,7 +603,7 @@ async def _send_transaction(
             )
             if selection is None:
                 raise typer.Exit(1)
-            utxos, mixdepth = selection
+            utxos, mixdepth, locktime_cutoff = selection
 
         # Calculate totals based on selected UTXOs
         total_input = sum(u.value for u in utxos)

@@ -5,15 +5,22 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+import typer
 
 from jmwallet.cli.send import _select_input_utxos
 from jmwallet.wallet.models import UTXOInfo
 
 
-def _utxo(*, label: str | None = None, locktime: int | None = None) -> UTXOInfo:
+def _utxo(
+    *,
+    label: str | None = None,
+    locktime: int | None = None,
+    vout: int = 0,
+    frozen: bool = False,
+) -> UTXOInfo:
     return UTXOInfo(
         txid="a" * 64,
-        vout=0,
+        vout=vout,
         value=100_000,
         address="bcrt1qselectorlabel",
         confirmations=6,
@@ -21,6 +28,7 @@ def _utxo(*, label: str | None = None, locktime: int | None = None) -> UTXOInfo:
         path="m/84'/1'/0'/0/0",
         mixdepth=0,
         label=label,
+        frozen=frozen,
         locktime=locktime,
     )
 
@@ -50,7 +58,7 @@ async def test_selector_preserves_user_and_fidelity_bond_labels(
 
     selected = await _select_input_utxos(
         wallet=wallet,
-        backend_settings=Mock(),
+        backend=Mock(),
         amount=50_000,
         mixdepth=None,
         interactive=True,
@@ -58,7 +66,7 @@ async def test_selector_preserves_user_and_fidelity_bond_labels(
         fee_rate=1.0,
     )
 
-    assert selected == ([user_labeled], 0)
+    assert selected == ([user_labeled], 0, None)
     assert [utxo.label for utxo in captured] == ["personal note", "bond note"]
     wallet.get_utxo_label_from_wallet.assert_not_called()
 
@@ -85,7 +93,7 @@ async def test_selector_classifies_unlabeled_regular_utxo(
 
     selected = await _select_input_utxos(
         wallet=wallet,
-        backend_settings=Mock(),
+        backend=Mock(),
         amount=50_000,
         mixdepth=None,
         interactive=True,
@@ -93,6 +101,64 @@ async def test_selector_classifies_unlabeled_regular_utxo(
         fee_rate=1.0,
     )
 
-    assert selected == ([unlabeled], 0)
+    assert selected == ([unlabeled], 0, None)
     assert unlabeled.label == "cj-out"
     wallet.get_utxo_label_from_wallet.assert_called_once_with(unlabeled.address)
+
+
+@pytest.mark.asyncio
+async def test_sweep_falls_back_to_expired_fidelity_bonds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Automatic sweep admits expired bonds when no regular coins qualify."""
+    mtp = 1_700_000_000
+    frozen_regular = _utxo(frozen=True)
+    expired_bond = _utxo(label="bond note", locktime=mtp - 1000, vout=1)
+    wallet = AsyncMock()
+    wallet.mixdepth_count = 1
+    wallet.get_balance = AsyncMock(return_value=200_000)
+    wallet.get_utxos = AsyncMock(return_value=[frozen_regular, expired_bond])
+    wallet.get_locked_input_outpoints = Mock(return_value=set())
+    backend = AsyncMock()
+    backend.get_median_time_past = AsyncMock(return_value=mtp)
+    monkeypatch.setattr(
+        "jmwallet.wallet.spend._is_signable_fidelity_bond",
+        lambda _wallet, _utxo: True,
+    )
+
+    selected = await _select_input_utxos(
+        wallet=wallet,
+        backend=backend,
+        amount=0,
+        mixdepth=0,
+        interactive=False,
+        destination="bcrt1qq6hag67dl53wl99vzg42z8eyzfz2xlkvwk6f7m",
+        fee_rate=1.0,
+    )
+
+    assert selected == ([expired_bond], 0, mtp)
+
+
+@pytest.mark.asyncio
+async def test_sweep_never_selects_frozen_bonds() -> None:
+    """Automatic sweep refuses to run when the only coins are frozen bonds."""
+    frozen_bond = _utxo(label="bond note", locktime=1_000_000, frozen=True)
+    wallet = AsyncMock()
+    wallet.mixdepth_count = 1
+    wallet.get_balance = AsyncMock(return_value=100_000)
+    wallet.get_utxos = AsyncMock(return_value=[frozen_bond])
+    wallet.get_locked_input_outpoints = Mock(return_value=set())
+    backend = AsyncMock()
+    backend.get_median_time_past = AsyncMock(return_value=1_700_000_000)
+
+    with pytest.raises(typer.Exit):
+        await _select_input_utxos(
+            wallet=wallet,
+            backend=backend,
+            amount=0,
+            mixdepth=0,
+            interactive=False,
+            destination="bcrt1qq6hag67dl53wl99vzg42z8eyzfz2xlkvwk6f7m",
+            fee_rate=1.0,
+        )
+    backend.get_median_time_past.assert_not_called()

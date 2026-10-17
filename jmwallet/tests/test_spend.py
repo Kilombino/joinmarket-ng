@@ -39,6 +39,7 @@ from jmwallet.wallet.spend import (
     resolve_input_utxos,
     select_automatic_direct_send_inputs,
     select_spendable_utxos,
+    select_sweep_input_utxos,
 )
 from jmwallet.wallet.utxo_metadata import AddressReservationError
 
@@ -247,6 +248,138 @@ class TestSelectSpendableUtxos:
     def test_all_frozen_returns_empty(self) -> None:
         utxos = [_make_utxo(frozen=True), _make_utxo(frozen=True, vout=1)]
         assert select_spendable_utxos(utxos) == []
+
+
+# ---------------------------------------------------------------------------
+# select_sweep_input_utxos
+# ---------------------------------------------------------------------------
+
+
+class TestSelectSweepInputUtxos:
+    """Sweep input selection with the expired fidelity-bond fallback."""
+
+    MTP = 1_700_000_000
+
+    @staticmethod
+    def _wallet(locked: set[tuple[str, int]] | None = None) -> MagicMock:
+        wallet = MagicMock()
+        wallet.get_locked_input_outpoints.return_value = locked or set()
+        return wallet
+
+    @staticmethod
+    def _backend() -> MagicMock:
+        backend = MagicMock()
+        backend.get_median_time_past = AsyncMock(return_value=TestSelectSweepInputUtxos.MTP)
+        return backend
+
+    @staticmethod
+    def _signable(monkeypatch: pytest.MonkeyPatch, value: bool) -> None:
+        monkeypatch.setattr(
+            "jmwallet.wallet.spend._is_signable_fidelity_bond",
+            lambda _wallet, _utxo: value,
+        )
+
+    @pytest.mark.anyio
+    async def test_prefers_regular_utxos_without_fallback(self) -> None:
+        regular = _make_utxo()
+        expired_bond = _make_utxo(locktime=self.MTP - 1000, vout=1)
+        backend = self._backend()
+
+        utxos, cutoff = await select_sweep_input_utxos(
+            self._wallet(), backend, [regular, expired_bond]
+        )
+
+        assert utxos == [regular]
+        assert cutoff is None
+        backend.get_median_time_past.assert_not_called()
+
+    @pytest.mark.anyio
+    async def test_excludes_frozen_regular_utxos(self) -> None:
+        frozen = _make_utxo(frozen=True)
+        regular = _make_utxo(vout=1)
+
+        utxos, cutoff = await select_sweep_input_utxos(
+            self._wallet(), self._backend(), [frozen, regular]
+        )
+
+        assert utxos == [regular]
+        assert cutoff is None
+
+    @pytest.mark.anyio
+    async def test_falls_back_to_expired_bonds_when_no_regular_qualifies(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._signable(monkeypatch, True)
+        frozen_regular = _make_utxo(frozen=True)
+        expired_bond = _make_utxo(locktime=self.MTP - 1000, vout=1)
+        backend = self._backend()
+
+        utxos, cutoff = await select_sweep_input_utxos(
+            self._wallet(), backend, [frozen_regular, expired_bond]
+        )
+
+        assert utxos == [expired_bond]
+        assert cutoff == self.MTP
+
+    @pytest.mark.anyio
+    async def test_frozen_bonds_never_trigger_fallback(self) -> None:
+        frozen_bond = _make_utxo(locktime=self.MTP - 1000, frozen=True)
+        backend = self._backend()
+
+        utxos, cutoff = await select_sweep_input_utxos(self._wallet(), backend, [frozen_bond])
+
+        assert utxos == []
+        assert cutoff is None
+        backend.get_median_time_past.assert_not_called()
+
+    @pytest.mark.anyio
+    async def test_fallback_excludes_unexpired_bonds(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._signable(monkeypatch, True)
+        locked_bond = _make_utxo(locktime=self.MTP + 100_000)
+        backend = self._backend()
+
+        utxos, cutoff = await select_sweep_input_utxos(self._wallet(), backend, [locked_bond])
+
+        assert utxos == []
+        assert cutoff == self.MTP
+
+    @pytest.mark.anyio
+    async def test_fallback_excludes_unsignable_bonds(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._signable(monkeypatch, False)
+        expired_bond = _make_utxo(locktime=self.MTP - 1000)
+        backend = self._backend()
+
+        utxos, cutoff = await select_sweep_input_utxos(self._wallet(), backend, [expired_bond])
+
+        assert utxos == []
+        assert cutoff == self.MTP
+
+    @pytest.mark.anyio
+    async def test_locked_outpoint_and_shared_script_excluded(self) -> None:
+        locked_utxo = _make_utxo(txid="cc" * 32)
+        same_script = _make_utxo(txid="dd" * 32, vout=1)
+        wallet = self._wallet(locked={("cc" * 32, 0)})
+
+        utxos, cutoff = await select_sweep_input_utxos(
+            wallet, self._backend(), [locked_utxo, same_script]
+        )
+
+        assert utxos == []
+        assert cutoff is None
+
+    @pytest.mark.anyio
+    async def test_locked_bond_outpoint_never_selected(self) -> None:
+        bond = _make_utxo(txid="ee" * 32, locktime=self.MTP - 1000)
+        wallet = self._wallet(locked={("ee" * 32, 0)})
+        backend = self._backend()
+
+        utxos, cutoff = await select_sweep_input_utxos(wallet, backend, [bond])
+
+        assert utxos == []
+        assert cutoff is None
+        backend.get_median_time_past.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

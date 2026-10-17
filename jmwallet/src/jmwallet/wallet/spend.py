@@ -263,6 +263,52 @@ def select_spendable_utxos(
     return result
 
 
+async def select_sweep_input_utxos(
+    wallet: WalletService,
+    backend: BlockchainBackend,
+    mixdepth_utxos: list[UTXOInfo],
+) -> tuple[list[UTXOInfo], int | None]:
+    """Select the inputs for a full-mixdepth sweep.
+
+    Regular spendable UTXOs are swept by default. Only when none qualify
+    does the fallback admit expired, unfrozen fidelity bonds this wallet
+    can sign. This supports explicit bond-redemption flows that freeze
+    every other coin without making bonds part of normal auto-selection
+    or linking them to unrelated funds.
+
+    Frozen UTXOs, CoinJoin-locked outpoints, regular UTXOs sharing an
+    address with a locked UTXO, and bonds whose timelock has not expired
+    are never selected.
+
+    Returns ``(utxos, locktime_cutoff)`` where the cutoff is the chain
+    median-time-past used to prove bond expiry (needed to derive a valid
+    transaction nLockTime), or ``None`` when the bond fallback did not
+    run.
+    """
+    locked_outpoints = {(txid.lower(), vout) for txid, vout in wallet.get_locked_input_outpoints()}
+    blocked_regular_scripts = {
+        utxo.scriptpubkey
+        for utxo in mixdepth_utxos
+        if not utxo.is_fidelity_bond and (utxo.txid, utxo.vout) in locked_outpoints
+    }
+    sweep_candidates = [
+        utxo
+        for utxo in mixdepth_utxos
+        if (utxo.txid, utxo.vout) not in locked_outpoints
+        and (utxo.is_fidelity_bond or utxo.scriptpubkey not in blocked_regular_scripts)
+    ]
+    utxos = select_spendable_utxos(sweep_candidates)
+    if utxos or not any(u.is_fidelity_bond and not u.frozen for u in sweep_candidates):
+        return utxos, None
+    locktime_cutoff = await backend.get_median_time_past()
+    bond_candidates = select_spendable_utxos(
+        sweep_candidates,
+        include_fidelity_bonds=True,
+        locktime_cutoff=locktime_cutoff,
+    )
+    return [u for u in bond_candidates if _is_signable_fidelity_bond(wallet, u)], locktime_cutoff
+
+
 def parse_outpoint(raw: str) -> tuple[str, int]:
     """Parse a ``txid:vout`` outpoint string into ``(txid, vout)``.
 
@@ -768,34 +814,8 @@ async def prepare_direct_send(
             input_utxos=input_utxos,
         )
     elif amount_sats == 0:
-        # Sweep regular coins by default. If there are none, admit expired
-        # hot-wallet bonds. This supports explicit bond-redemption flows that
-        # freeze every other coin without making bonds part of normal
-        # auto-selection or linking them to unrelated funds.
         raw_utxos = await wallet.get_utxos(mixdepth)
-        locked_outpoints = {
-            (txid.lower(), vout) for txid, vout in wallet.get_locked_input_outpoints()
-        }
-        blocked_regular_scripts = {
-            utxo.scriptpubkey
-            for utxo in raw_utxos
-            if not utxo.is_fidelity_bond and (utxo.txid, utxo.vout) in locked_outpoints
-        }
-        sweep_candidates = [
-            utxo
-            for utxo in raw_utxos
-            if (utxo.txid, utxo.vout) not in locked_outpoints
-            and (utxo.is_fidelity_bond or utxo.scriptpubkey not in blocked_regular_scripts)
-        ]
-        utxos = select_spendable_utxos(sweep_candidates)
-        if not utxos and any(u.is_fidelity_bond and not u.frozen for u in sweep_candidates):
-            locktime_cutoff = await backend.get_median_time_past()
-            bond_candidates = select_spendable_utxos(
-                sweep_candidates,
-                include_fidelity_bonds=True,
-                locktime_cutoff=locktime_cutoff,
-            )
-            utxos = [u for u in bond_candidates if _is_signable_fidelity_bond(wallet, u)]
+        utxos, locktime_cutoff = await select_sweep_input_utxos(wallet, backend, raw_utxos)
     else:
         selection, _selected_mixdepth = await select_automatic_direct_send_inputs(
             wallet=wallet,
