@@ -139,6 +139,71 @@ def test_tui_script_has_environment_detection() -> None:
     assert "bonus.joinmarket-ng.sh" in content
 
 
+@pytest.mark.parametrize(
+    "home",
+    [
+        "/home/test-user",
+        "/Users/test-user",
+        "/srv/home/test-user",
+        "/Users/Test User",
+        None,
+        "",
+    ],
+)
+@pytest.mark.parametrize("raspiblitz", [False, True])
+def test_tui_environment_home_resolution(
+    tmp_path: Path, home: str | None, raspiblitz: bool
+) -> None:
+    """Standalone uses HOME; RaspiBlitz keeps its dedicated service user's paths."""
+    detection = SCRIPT_PATH.read_text().split(
+        "# =============================================================================\n# ---- Exit Handler",
+        1,
+    )[0]
+    detection = detection.replace(
+        'BONUS_SCRIPT="/home/admin/config.scripts/bonus.joinmarket-ng.sh"',
+        'BONUS_SCRIPT="$1"',
+        1,
+    )
+    bonus_script = tmp_path / "bonus.joinmarket-ng.sh"
+    if raspiblitz:
+        bonus_script.touch()
+    env = {"PATH": os.environ["PATH"]}
+    if home is not None:
+        env["HOME"] = home
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            detection + '\nprintf "%s\\n" "$RASPIBLITZ" "$HOME_JM" "$VENV_BIN"',
+            "bash",
+            str(bonus_script),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=5,
+    )
+    if not raspiblitz and not home:
+        assert result.returncode != 0
+        assert "HOME must be set to your home directory" in result.stderr
+        assert result.stdout == ""
+        return
+    assert result.returncode == 0, result.stderr
+    if raspiblitz:
+        assert result.stdout.splitlines() == [
+            "1",
+            "/home/joinmarketng",
+            "/home/joinmarketng/venv/bin",
+        ]
+    else:
+        assert result.stdout.splitlines() == [
+            "0",
+            home,
+            f"{home}/.joinmarket-ng/venv/bin",
+        ]
+
+
 @pytest.mark.parametrize("raspiblitz", [False, True])
 @pytest.mark.parametrize("maker_running", [False, True])
 @pytest.mark.parametrize("dialog_status", [0, 1, 255])

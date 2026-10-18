@@ -23,6 +23,15 @@ Use the matching activation file for a custom installation directory. A missing
 See [installation profiles](install-advanced.md#installation-profiles).
 Flatpak commands must run through the [Flatpak CLI wrapper](flatpak.md#running-cli-commands).
 
+## Wallet Missing From The Terminal Menu After Updating
+
+The standalone `jm-ng` menu now uses `$HOME/.joinmarket-ng` instead of assuming
+`/home/<username>/.joinmarket-ng`. This fixes macOS and custom Linux home paths;
+RaspiBlitz paths are unchanged. If your home is outside `/home/<username>` and
+an older menu stored wallets there, those files remain at the old location.
+No files are moved or merged automatically. Keep both directories and wallet
+backups intact while checking the paths and configuration before making changes.
+
 ## Cannot Connect To Bitcoin Core
 
 Check that the node is running, synced, and reachable at the configured RPC

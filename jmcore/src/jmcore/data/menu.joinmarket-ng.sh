@@ -26,7 +26,7 @@ if [ -f "$BONUS_SCRIPT" ]; then
 else
     RASPIBLITZ=0
     USER_JM=$(whoami)
-    HOME_JM="/home/${USER_JM}"
+    HOME_JM="${HOME:?HOME must be set to your home directory}"
     VENV_BIN="${HOME_JM}/.joinmarket-ng/venv/bin"
 fi
 
