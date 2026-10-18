@@ -3073,8 +3073,9 @@ class TestDirectConnectionHandshake:
 
     @pytest.mark.asyncio
     async def test_try_handle_handshake_ignores_wrong_network(self, maker_bot):
-        """Test that handshake from wrong network is silently ignored (no response)."""
+        """Test that handshake from wrong network gets no response and the socket is closed."""
         mock_conn = MagicMock(spec=TCPConnection)
+        mock_conn.close = AsyncMock()
 
         # Create a handshake request with wrong network
         handshake_request = {
@@ -3099,6 +3100,8 @@ class TestDirectConnectionHandshake:
         assert result is True
         # Should NOT send any response for network mismatch
         mock_conn.send.assert_not_called()
+        # Fail fast instead of holding an unbound socket until the deadline
+        mock_conn.close.assert_awaited_once_with()
 
     @pytest.mark.asyncio
     async def test_try_handle_handshake_accepts_testnet_peer_on_signet(self):

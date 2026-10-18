@@ -38,6 +38,12 @@ from maker.rate_limiting import DirectConnectionRateLimiter
 _MAX_DIRECT_CONNECTIONS = 256
 _DIRECT_CONNECTION_IDLE_TIMEOUT_SEC = 60.0
 _DIRECT_CONNECTION_UNAUTHENTICATED_TIMEOUT_SEC = 60.0
+# Every known client (reference, our taker, orderbook watcher, directory
+# probes) sends HANDSHAKE as the first line on a new socket, so a conforming
+# peer never accumulates pre-handshake drops. A scanner or flood reaches this
+# bound in about a second under the per-socket token bucket.
+_MAX_PREHANDSHAKE_DROPS = 5
+_PREHANDSHAKE_LOG_INTERVAL_SEC = 10.0
 
 
 @dataclass(slots=True)
@@ -47,10 +53,16 @@ class DirectConnectionState:
     The first verified sender overrides a mismatched provisional handshake nick.
     This favors availability after a forged preclaim without allowing one socket
     to act as multiple verified identities.
+
+    ``prehandshake_drops`` counts lines received before any accepted handshake.
+    It is per socket by design: closing a socket records nothing against the
+    peer, so a reconnecting client starts clean. Tor's intro-point rate limiting
+    and PoW are the layer that makes reconnect floods expensive.
     """
 
     nick: str | None = None
     verified: bool = False
+    prehandshake_drops: int = 0
 
 
 async def _handle_direct_public_message(
@@ -144,10 +156,33 @@ async def _process_direct_message(
         return True
 
     if state.nick is None:
-        logger.warning("Dropping message before direct handshake")
-        logger.bind(sensitive=True).warning(
-            f"Dropping message before direct handshake from {peer_str}"
+        # Nothing is parsed or signed for an unhandshaked socket, so this is
+        # noise (scanners, non-JoinMarket probes, broken clients), not a threat
+        # to log at WARNING once per line.
+        state.prehandshake_drops += 1
+        bot._log_rate_limited(
+            f"direct_prehandshake:{peer_str}",
+            "Dropping message before direct handshake",
+            level="debug",
+            interval=_PREHANDSHAKE_LOG_INTERVAL_SEC,
         )
+        bot._log_rate_limited(
+            f"direct_prehandshake_sensitive:{peer_str}",
+            f"Dropping message before direct handshake from {peer_str}",
+            level="debug",
+            interval=_PREHANDSHAKE_LOG_INTERVAL_SEC,
+            sensitive=True,
+        )
+        if state.prehandshake_drops >= _MAX_PREHANDSHAKE_DROPS:
+            logger.debug(
+                f"Closing direct connection after {state.prehandshake_drops} "
+                "messages without handshake"
+            )
+            logger.bind(sensitive=True).debug(
+                f"Closing direct connection from {peer_str} after "
+                f"{state.prehandshake_drops} messages without handshake"
+            )
+            return False
         return True
 
     parsed = bot._parse_direct_message(data, generation_id)
@@ -429,11 +464,16 @@ class DirectConnectionMixin:
         our_net = self.config.network.value
         if peer_network and peer_network != our_net:
             if not (peer_network in testnet_family and our_net in testnet_family):
+                # Close instead of leaving an unbound socket open until the
+                # unauthenticated deadline: the peer fails fast and falls back
+                # to directory relay, and the admission slot is freed.
                 logger.warning(
                     f"Network mismatch from {peer_nick}: "
                     f"{peer_network} != {our_net}. "
-                    f"Not responding to handshake."
+                    f"Closing direct connection."
                 )
+                await connection.close()
+                self._remove_direct_connection(connection, generation_id)
                 return True
 
         # The unsigned handshake nick is only a socket-local hint. It neither
