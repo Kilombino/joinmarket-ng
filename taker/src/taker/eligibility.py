@@ -12,7 +12,7 @@ selection outcome:
 
 - minimum confirmations (``taker_utxo_age``),
 - frozen UTXOs (never auto-selected),
-- fidelity bonds (never auto-spent),
+- fidelity bonds (never CoinJoin inputs, expired or not),
 - inputs locked by another in-flight CoinJoin round,
 - the mixdepth-0 merge restriction (handled by a dry-run of ``select_utxos``).
 """
@@ -126,12 +126,13 @@ def selectable_for_interactive(
     min_confirmations: int,
     excluded_outpoints: set[tuple[str, int]] | None = None,
 ) -> list[UTXOInfo]:
-    """Return UTXOs a user may pick in the interactive selector.
+    """Return UTXOs a user may pick in the interactive CoinJoin selector.
 
-    The interactive selector (``--select-utxos``) shows frozen/locked UTXOs but
-    renders them unselectable, and lets the user spend unlocked fidelity bonds.
-    ``excluded_outpoints`` keeps in-flight CoinJoin inputs visible while
-    preventing their reuse.
+    The interactive selector (``--select-utxos``) shows frozen, locked and
+    fidelity bond UTXOs but renders them unselectable. Expired bonds are
+    excluded too: they can only be redeemed with a direct send, never used as
+    CoinJoin inputs. ``excluded_outpoints`` keeps in-flight CoinJoin inputs
+    visible while preventing their reuse.
     """
     excluded_outpoints = excluded_outpoints or set()
     return [
@@ -139,9 +140,21 @@ def selectable_for_interactive(
         for u in utxos
         if (u.confirmations >= min_confirmations)
         and not u.frozen
-        and not (u.is_fidelity_bond and u.is_locked)
+        and not u.is_fidelity_bond
         and (u.txid, u.vout) not in excluded_outpoints
     ]
+
+
+def fidelity_bond_inputs(utxos: list[UTXOInfo]) -> list[UTXOInfo]:
+    """Return the UTXOs that must never be CoinJoin inputs.
+
+    Fidelity bonds (any UTXO carrying a locktime) and P2WSH outputs (the only
+    P2WSH scripts a BIP84 taker wallet holds are bonds) are rejected whether or
+    not the timelock has expired: the inputs would be disclosed to makers and
+    then refused at signing time. Mirrors the signer guard in
+    ``CoinJoinSession._sign_our_inputs``.
+    """
+    return [u for u in utxos if u.is_fidelity_bond or u.is_p2wsh]
 
 
 def podle_threshold_met(

@@ -67,11 +67,13 @@ async def test_selector_receives_whole_wallet_and_pin(
         allowed_mixdepth=None,
         min_confirmations=0,
         excluded_outpoints=None,
+        allow_fidelity_bonds=True,
     ):
         captured["utxos"] = list(utxos)
         captured["allowed_mixdepth"] = allowed_mixdepth
         captured["min_confirmations"] = min_confirmations
         captured["excluded_outpoints"] = excluded_outpoints
+        captured["allow_fidelity_bonds"] = allow_fidelity_bonds
         return [utxos_by_md[2][0]]
 
     import jmwallet.utxo_selector
@@ -84,6 +86,8 @@ async def test_selector_receives_whole_wallet_and_pin(
     assert captured["allowed_mixdepth"] is None
     assert captured["min_confirmations"] == 5
     assert captured["excluded_outpoints"] == set()
+    # CoinJoin context: bonds are displayed but never selectable.
+    assert captured["allow_fidelity_bonds"] is False
     # UTXOs from every mixdepth are shown, not just one.
     shown = captured["utxos"]
     assert isinstance(shown, list)
@@ -206,6 +210,84 @@ async def test_pinned_mixdepth_without_eligible_utxos_fails(tmp_path: Path) -> N
     assert taker.state == TakerState.FAILED
     assert taker._session.last_failure_reason is not None
     assert "mixdepth 0" in taker._session.last_failure_reason
+
+
+def _expired_bond(txid_char: str = "b", mixdepth: int = 0) -> object:
+    bond = make_utxo(
+        txid_char=txid_char,
+        mixdepth=mixdepth,
+        confirmations=10,
+        scriptpubkey="0020" + txid_char * 64,
+        path=f"m/84'/1'/{mixdepth}'/2/0",
+    )
+    bond.locktime = 1  # 1970: expired, so it would otherwise count as spendable
+    return bond
+
+
+@pytest.mark.asyncio
+async def test_wallet_with_only_expired_bond_fails_before_selector(tmp_path: Path) -> None:
+    """An expired bond is not a CoinJoin input, so a bond-only wallet fails preflight."""
+    taker = Taker(_make_wallet({0: [_expired_bond()]}), _backend(), _make_config(tmp_path))
+
+    result = await taker._maybe_select_utxos_interactively(amount=0, mixdepth=None)
+
+    assert result is None
+    assert taker.state == TakerState.FAILED
+    assert taker._session.last_failure_reason is not None
+    assert "fidelity bonds" in taker._session.last_failure_reason
+
+
+@pytest.mark.asyncio
+async def test_check_utxo_eligibility_rejects_expired_bond_only_wallet(tmp_path: Path) -> None:
+    taker = Taker(_make_wallet({0: [_expired_bond()]}), _backend(), _make_config(tmp_path))
+
+    reason = await taker.check_utxo_eligibility(amount=1_000_000, mixdepth=None)
+
+    assert reason is not None
+    assert "fidelity bonds" in reason
+
+
+@pytest.mark.asyncio
+async def test_bond_input_is_rejected_before_inputs_are_reserved(tmp_path: Path) -> None:
+    """Defense in depth: a bond that slipped through selection never reaches makers.
+
+    Simulates a selector returning an expired bond (e.g. a bypassed TUI) and
+    checks the round fails before ``reserve_coinjoin_inputs``, which is the
+    last step before maker negotiation.
+    """
+    regular = make_utxo(txid_char="a", mixdepth=0, confirmations=10)
+    bond = _expired_bond()
+    wallet = _make_wallet({0: [regular, bond]})
+    config = _make_config(tmp_path, counterparty_count=1, minimum_makers=1, fee_rate=1.0)
+    backend = _backend()
+    backend.get_mempool_min_fee = AsyncMock(return_value=None)
+    taker = Taker(wallet, backend, config)
+    offer = Offer(
+        counterparty="maker1",
+        oid=0,
+        ordertype=OfferType.SW0_ABSOLUTE,
+        minsize=10_000,
+        maxsize=100_000_000,
+        txfee=0,
+        cjfee=0,
+    )
+    taker.directory_client.fetch_orderbook = AsyncMock(return_value=[offer])
+    taker._update_offers_with_bond_values = AsyncMock()  # type: ignore[method-assign]
+    taker.orderbook_manager.select_makers_for_sweep = Mock(
+        return_value=({"maker1": offer}, 24_000_000, 0)
+    )
+    taker._maybe_select_utxos_interactively = AsyncMock(return_value=[bond])  # type: ignore[method-assign]
+    taker._run_auth_with_replacements = AsyncMock(  # type: ignore[method-assign]
+        side_effect=AssertionError("maker negotiation must not start")
+    )
+
+    result = await taker.do_coinjoin(amount=0, destination="INTERNAL", mixdepth=None)
+
+    assert result is None
+    assert taker.state == TakerState.FAILED
+    assert taker._session.last_failure_reason is not None
+    assert "fidelity bonds" in taker._session.last_failure_reason
+    wallet.reserve_coinjoin_inputs.assert_not_called()
 
 
 @pytest.mark.asyncio

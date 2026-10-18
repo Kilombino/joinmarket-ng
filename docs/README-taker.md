@@ -47,7 +47,9 @@ A sweep links the inputs it spends. It is not automatically the best privacy
 choice. For manual input selection, use `--select-utxos` with an explicit
 `--amount`; omitting the amount sweeps the selection. Selection is limited to
 one mixdepth. `--input-utxo TXID:VOUT` selects exact inputs without an interactive
-menu; repeat it for each input and specify the source mixdepth.
+menu; repeat it for each input and specify the source mixdepth. Fidelity bonds
+are shown but never selectable as CoinJoin inputs, even after expiry; redeem them
+with `jm-wallet send --select-utxos` instead.
 
 ## Configuration Notes
 

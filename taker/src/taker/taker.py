@@ -49,6 +49,7 @@ from taker.coinjoin_session import CoinJoinSession
 from taker.config import Schedule, TakerConfig, resolve_counterparty_count
 from taker.eligibility import (
     classify_utxos,
+    fidelity_bond_inputs,
     podle_threshold_met,
     selectable_for_interactive,
 )
@@ -596,9 +597,9 @@ class Taker(TakerMonitoringMixin):
                 return str(exc)
             return None
 
-        # Interactive selection follows different rules (the user may pick
-        # unlocked fidelity bonds and is not bound to auto-selection), so only
-        # require that *something* is selectable here.
+        # Interactive selection is not bound to auto-selection (the user may
+        # pick any confirmed, non-frozen, non-bond UTXO), so only require that
+        # *something* is selectable here.
         if self.config.select_utxos:
             mixdepths = (
                 [mixdepth] if mixdepth is not None else list(range(self.wallet.mixdepth_count))
@@ -614,7 +615,7 @@ class Taker(TakerMonitoringMixin):
                     ).no_eligible_reason()
                 return (
                     "No selectable UTXOs in any mixdepth (all UTXOs are "
-                    "frozen, immature, locked fidelity bonds, or in use)"
+                    "frozen, immature, fidelity bonds, or in use)"
                 )
             return None
 
@@ -1382,6 +1383,26 @@ class Taker(TakerMonitoringMixin):
                         self.state = TakerState.FAILED
                         return None
 
+            # Last local checkpoint before any input data reaches makers:
+            # whatever path chose the inputs (explicit, interactive, automatic,
+            # sweep, HTTP), a fidelity bond must never be among them. The
+            # signer guard in ``_sign_our_inputs`` would also catch it, but
+            # only after makers have seen the inputs, outputs and PoDLE.
+            bond_inputs = fidelity_bond_inputs(self._session.preselected_utxos)
+            if bond_inputs:
+                reason = (
+                    f"{len(bond_inputs)} selected input(s) are fidelity bonds, which "
+                    f"cannot be used in CoinJoins (redeem with jm-wallet send --select-utxos)"
+                )
+                logger.error(reason)
+                logger.bind(sensitive=True).error(
+                    "Fidelity bond inputs rejected: {}",
+                    ", ".join(u.outpoint for u in bond_inputs),
+                )
+                self._session.last_failure_reason = reason
+                self.state = TakerState.FAILED
+                return None
+
             # "Block first, then continue": persist a lock on our chosen inputs
             # before negotiating with makers, so a concurrent round on the same
             # wallet cannot pick the same UTXO and produce a conflicting
@@ -1636,7 +1657,8 @@ class Taker(TakerMonitoringMixin):
                 return None
 
             # Check that at least some UTXOs are selectable (confirmed
-            # enough, not frozen/locked, and in the pinned mixdepth if any).
+            # enough, not frozen, not a fidelity bond, and in the pinned
+            # mixdepth if any).
             candidates = (
                 available_utxos
                 if mixdepth is None
@@ -1649,7 +1671,8 @@ class Taker(TakerMonitoringMixin):
                 where = "wallet" if mixdepth is None else f"mixdepth {mixdepth}"
                 reason = (
                     f"No eligible UTXOs in {where} "
-                    f"(all {len(candidates)} UTXOs are frozen, immature, locked, or in use)"
+                    f"(all {len(candidates)} UTXOs are frozen, immature, "
+                    f"fidelity bonds, or in use)"
                 )
                 logger.error(reason)
                 self._session.last_failure_reason = reason
@@ -1666,12 +1689,15 @@ class Taker(TakerMonitoringMixin):
                 f"Launching interactive UTXO selector ({len(available_utxos)} available, "
                 f"target amount: {amount} sats, sweep: {amount == 0})..."
             )
+            # Bonds (expired or not) are shown but never selectable: a bond
+            # input would be disclosed to makers and then refused at signing.
             manually_selected_utxos = select_utxos_interactive(
                 available_utxos,
                 amount,
                 allowed_mixdepth=mixdepth,
                 min_confirmations=min_age,
                 excluded_outpoints=locked_inputs,
+                allow_fidelity_bonds=False,
             )
 
             if not manually_selected_utxos:

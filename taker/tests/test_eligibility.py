@@ -9,6 +9,7 @@ from jmwallet.wallet.models import UTXOInfo
 from taker.eligibility import (
     NO_ELIGIBLE_PREFIX,
     classify_utxos,
+    fidelity_bond_inputs,
     podle_threshold_met,
     selectable_for_interactive,
 )
@@ -108,6 +109,33 @@ def test_selectable_for_interactive_excludes_frozen_and_locked_bonds() -> None:
     selectable = selectable_for_interactive(utxos, min_confirmations=5)
     assert len(selectable) == 1
     assert selectable[0].txid == "a" * 64
+
+
+def test_selectable_for_interactive_excludes_expired_bonds() -> None:
+    """Expired bonds are redeemable by direct send only, never CoinJoin inputs."""
+    past = int(time.time()) - 100_000
+    regular = _utxo(txid_char="a")
+    expired_bond = _utxo(txid_char="b", locktime=past)
+
+    assert selectable_for_interactive([regular, expired_bond], min_confirmations=5) == [regular]
+    assert selectable_for_interactive([expired_bond], min_confirmations=5) == []
+
+
+def test_fidelity_bond_inputs_flags_locktime_and_p2wsh() -> None:
+    past = int(time.time()) - 100_000
+    future = int(time.time()) + 100_000
+    regular = _utxo(txid_char="a")
+    expired_bond = _utxo(txid_char="b", locktime=past)
+    locked_bond = _utxo(txid_char="c", locktime=future)
+    # A P2WSH output whose locktime was not populated must still be rejected,
+    # matching the signer guard.
+    p2wsh_without_locktime = _utxo(txid_char="d")
+    p2wsh_without_locktime.scriptpubkey = "0020" + "dd" * 32
+
+    flagged = fidelity_bond_inputs([regular, expired_bond, locked_bond, p2wsh_without_locktime])
+
+    assert flagged == [expired_bond, locked_bond, p2wsh_without_locktime]
+    assert fidelity_bond_inputs([regular]) == []
 
 
 def test_selectable_for_interactive_excludes_in_flight_inputs() -> None:

@@ -84,7 +84,8 @@ jm-wallet send <destination> \
 
 The wallet sets the CLTV transaction fields and witness automatically.
 Unexpired bonds cannot be selected, and automatic selection always excludes
-bonds.
+bonds. Bonds are never CoinJoin inputs: `jm-taker coinjoin --select-utxos`
+shows them as `no-cj` and refuses them before contacting any maker.
 
 ## External-Key Bonds
 
