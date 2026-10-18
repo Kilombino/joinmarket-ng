@@ -144,7 +144,7 @@ def _summary_body(notifier: Notifier, f: dict[str, Any]) -> str:
         success_rate = successful / total_requests * 100 if total_requests > 0 else 0.0
         body = (
             f"Period: {period_label}\n"
-            f"Requests: {total_requests}\n"
+            f"CoinJoin attempts: {total_requests}\n"
             f"Successful: {successful}\n"
             f"Failed: {failed}\n"
             f"Success rate: {success_rate:.0f}%\n"
@@ -153,6 +153,7 @@ def _summary_body(notifier: Notifier, f: dict[str, Any]) -> str:
             f" / {notifier._format_amount(total_volume)}\n"
             f"UTXOs disclosed: {utxos_disclosed}"
         )
+    body += "\nOnly attempts with disclosed inputs and output addresses are counted."
     if notifier.config.notify_summary_balance:
         total_balance = f.get("total_balance")
         utxo_count = f.get("utxo_count")

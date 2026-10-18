@@ -1234,7 +1234,9 @@ class TestNotifySummary:
         title = call_kwargs[1].get("title", call_kwargs[0][0] if call_kwargs[0] else "")
         body = call_kwargs[1].get("body", call_kwargs[0][1] if len(call_kwargs[0]) > 1 else "")
         assert "Daily Summary" in title
-        assert "Requests: 10" in body
+        assert "CoinJoin attempts: 10" in body
+        assert "Requests:" not in body
+        assert "Only attempts with disclosed inputs and output addresses are counted." in body
         assert "Successful: 8" in body
         assert "Failed: 2" in body
         assert "80%" in body
@@ -1262,6 +1264,7 @@ class TestNotifySummary:
         call_kwargs = notifier._send.call_args
         body = call_kwargs[1].get("body", call_kwargs[0][1] if len(call_kwargs[0]) > 1 else "")
         assert "No CoinJoin activity" in body
+        assert "Only attempts with disclosed inputs and output addresses are counted." in body
 
     @pytest.mark.asyncio
     async def test_summary_amounts_hidden(self) -> None:
