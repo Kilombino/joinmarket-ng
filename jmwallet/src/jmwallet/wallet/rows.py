@@ -151,18 +151,30 @@ class BranchSummaryRow:
     frozen_balance: int = 0
     locked_balance: int = 0  # fb-a funds (fidelity bond branch only)
     expired_balance: int = 0  # fb-x funds (fidelity bond branch only)
+    expired_frozen_balance: int = 0  # frozen fb-x funds (fidelity bond branch only)
 
     @property
     def spendable(self) -> int:
-        """Balance usable for normal coin selection.
+        """Balance usable for automatic coin selection.
 
-        Fidelity bond funds are never spendable through normal coin
-        selection (locked ones cannot move; expired ones must be redeemed
-        explicitly), matching the legacy "(spendable: 0 sats)" display.
+        Fidelity bond funds are never auto-selected (locked ones cannot
+        move; expired ones are spendable only via explicit selection, see
+        :attr:`expired_spendable`), so the branch contributes 0 — this
+        also matches the legacy "(spendable: 0 sats)" display.
         """
         if self.branch == FIDELITY_BOND_BRANCH:
             return 0
         return self.balance - self.frozen_balance
+
+    @property
+    def expired_spendable(self) -> int:
+        """Expired bond funds that are spendable right now.
+
+        Frozen expired bonds are excluded: frozen means excluded from
+        any transaction, so counting them would contradict the ``frozn``
+        state shown on the row.
+        """
+        return self.expired_balance - self.expired_frozen_balance
 
 
 @dataclass
@@ -376,7 +388,9 @@ def summarize_branch(
     Expects the rows produced by one :func:`build_branch_rows` call.
     Hidden rows contribute nothing (hidden addresses are empty by
     construction). For the fidelity bond branch, funds are additionally
-    split into locked (locktime in the future) and expired.
+    split into locked (locktime in the future) and expired, and the
+    frozen share of the expired funds is tracked separately so the
+    spendable (explicit) figure can exclude it.
     """
     if now is None:
         now = int(time.time())
@@ -384,6 +398,7 @@ def summarize_branch(
     frozen = 0
     locked = 0
     expired = 0
+    expired_frozen = 0
     for row in rows:
         if not isinstance(row, UtxoRow):
             continue
@@ -395,6 +410,8 @@ def summarize_branch(
                 locked += row.utxo.value
             else:
                 expired += row.utxo.value
+                if row.utxo.frozen:
+                    expired_frozen += row.utxo.value
     return BranchSummaryRow(
         mixdepth=mixdepth,
         branch=branch,
@@ -402,6 +419,7 @@ def summarize_branch(
         frozen_balance=frozen,
         locked_balance=locked,
         expired_balance=expired,
+        expired_frozen_balance=expired_frozen,
     )
 
 

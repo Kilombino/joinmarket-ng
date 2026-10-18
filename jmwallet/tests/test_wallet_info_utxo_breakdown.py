@@ -388,14 +388,14 @@ def test_show_utxos_headers_colored_on_tty(categorized_wallet):
                     ],
                 )
             assert result.exit_code == 0, f"Command failed: {result.stdout}"
-            # Bold-yellow headers, e.g. ``Total Wallet Balance:``.
+            # Bold-yellow footer title, e.g. ``Wallet balance calculation``.
             assert "\033[1;33m" in result.stdout, "Bold-yellow header missing"
             # Cyan mixdepth labels in the breakdown rows.
             assert "\033[0;36m" in result.stdout, "Cyan mixdepth label missing"
             # Reset sequences follow every colored span.
             assert "\033[0m" in result.stdout, "Reset sequence missing"
             # Plain text is still present underneath the ANSI codes.
-            assert "Total Wallet Balance:" in result.stdout
+            assert "Total Wallet Balance" in result.stdout
             assert "Spendable Balance by Mixdepth:" in result.stdout
 
 
@@ -457,8 +457,9 @@ def test_basic_view_mixdepth_rows_follow_wallet_mixdepth_count(
             for row in rows[:-1]:
                 assert row.endswith("0 sats") or row.endswith("0 sats (44,866 Fidelity Bonds)")
             total_row = next(
-                line
-                for line in result.stdout.splitlines()
-                if line.startswith("Total Wallet Balance:")
+                line for line in result.stdout.splitlines() if "Total Wallet Balance" in line
             )
-            assert total_row.endswith("82,028 sats")  # Spendable + frozen + fidelity bond.
+            # Sums-first footer: the amount opens the (unindented) line.
+            assert total_row.lstrip().startswith(
+                "82,028 sats"
+            )  # Spendable + frozen + fidelity bond.

@@ -362,6 +362,7 @@ class TestSummaries:
         assert summary.spendable == 30_000
         assert summary.locked_balance == 0
         assert summary.expired_balance == 0
+        assert summary.expired_frozen_balance == 0
 
     def test_summarize_branch_ignores_non_utxo_rows(self) -> None:
         """Hidden/address rows contribute nothing to the balance."""
@@ -402,6 +403,59 @@ class TestSummaries:
         assert summary.balance == 100_000
         assert summary.locked_balance == 60_000
         assert summary.expired_balance == 40_000
+        assert summary.expired_frozen_balance == 0
+        assert summary.expired_spendable == 40_000
+        assert summary.spendable == 0
+
+    def test_summarize_branch_expired_frozen_bond(self) -> None:
+        """Frozen expired bonds are excluded from expired_spendable.
+
+        A frozen *active* bond counts toward frozen_balance but must not
+        reduce expired_frozen_balance.
+        """
+        locked_frozen = _addr(
+            address="bc1pbond0",
+            index=0,
+            status="bond",
+            is_bond=True,
+            is_external=False,
+            locktime=NOW + 86_400,
+            balance=60_000,
+            utxos=[_utxo(address="bc1pbond0", value=60_000, locktime=NOW + 86_400, frozen=True)],
+        )
+        expired_frozen = _addr(
+            address="bc1pbond1",
+            index=1,
+            status="bond",
+            is_bond=True,
+            is_external=False,
+            locktime=NOW - 86_400,
+            balance=25_000,
+            utxos=[_utxo(address="bc1pbond1", value=25_000, locktime=NOW - 86_400, frozen=True)],
+        )
+        expired = _addr(
+            address="bc1pbond2",
+            index=2,
+            status="bond",
+            is_bond=True,
+            is_external=False,
+            locktime=NOW - 86_400,
+            balance=40_000,
+            utxos=[_utxo(address="bc1pbond2", value=40_000, locktime=NOW - 86_400)],
+        )
+        rows = build_branch_rows(
+            [locked_frozen, expired_frozen, expired],
+            mixdepth=0,
+            branch=FIDELITY_BOND_BRANCH,
+            now=NOW,
+        )
+        summary = summarize_branch(rows, mixdepth=0, branch=FIDELITY_BOND_BRANCH, now=NOW)
+        assert summary.balance == 125_000
+        assert summary.frozen_balance == 85_000
+        assert summary.locked_balance == 60_000
+        assert summary.expired_balance == 65_000
+        assert summary.expired_frozen_balance == 25_000
+        assert summary.expired_spendable == 40_000
         assert summary.spendable == 0
 
     def test_summarize_mixdepth_includes_bonds_in_total_not_spendable(self) -> None:

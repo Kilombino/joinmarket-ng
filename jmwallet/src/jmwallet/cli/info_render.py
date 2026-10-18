@@ -22,9 +22,10 @@ not tax the ``tag`` column width.
 
 The fidelity bond branch adds a ``fb-date`` column — the locktime date
 (``YY-MM-DD``) qualifying the fb-a/fb-x label — after ``state``, which
-there shows the lock status (``lock``/``redeem``; a pending outgoing
-spend overrides it). Frozen UTXOs append ``frozn`` to that state. A 0-conf
-bond shows ``0`` under ``confs`` instead of an ``unconf`` state.
+there shows the bond spendability (``lock`` while time-locked, ``spend``
+once expired; a pending outgoing spend overrides it). Frozen UTXOs append
+``frozn`` to that state. A 0-conf bond shows ``0`` under ``confs``
+instead of an ``unconf`` state.
 """
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ from jmwallet.wallet.rows import (
 # Units live in the headers; the cells carry bare numbers.
 _BASE_HEADERS = ("idx", "address", "sats", "confs", "tag", "state", "outpoint")
 # The fidelity bond branch adds the locktime date (fb-date) after the state
-# column; there state shows the lock status (lock/redeem).
+# column; there state shows the bond spendability (lock/spend).
 _FB_HEADERS = ("idx", "address", "sats", "confs", "tag", "state", "fb-date", "outpoint")
 
 _SEP = " | "
@@ -86,14 +87,17 @@ def _state_text(row: UtxoRow | AddressRow) -> str:
 
 
 def _fb_state_text(row: UtxoRow | AddressRow) -> str:
-    """Lock status for fidelity bond rows, retaining frozen indications.
+    """Spendability for fidelity bond rows, retaining frozen indications.
 
-    Empty bond addresses show no state (nothing to lock or redeem). A
-    0-conf bond shows ``0`` under ``confs`` instead of an ``unconf``
-    state.
+    Time-locked bonds show ``lock``; expired ones show ``spend`` — the
+    same token as regular branches, since expired bonds are spendable
+    (via explicit selection only, never auto-selected, and never as a
+    CoinJoin input). Empty bond addresses show no state (nothing to lock
+    or spend). A 0-conf bond shows ``0`` under ``confs`` instead of an
+    ``unconf`` state.
     """
     if isinstance(row, UtxoRow):
-        state = "pend" if row.pending else "lock" if row.label == "fb-a" else "redeem"
+        state = "pend" if row.pending else "lock" if row.label == "fb-a" else "spend"
         return f"{state} frozn" if row.frozen else state
     return "pend" if row.pending else ""
 
@@ -266,11 +270,13 @@ def render_hidden_note(hidden_count: int) -> str:
 
 
 def render_branch_summary(summary: BranchSummaryRow) -> str:
-    """Per-branch balance line (legacy wording), fed from the summary row.
+    """Per-branch balance line, fed from the summary row.
 
-    Fidelity bond funds are never spendable through normal coin selection;
-    their breakdown distinguishes time-locked from expired funds — expired
-    bonds are redeemable (the timelock has run out).
+    Fidelity bond funds are never auto-selected; their breakdown
+    distinguishes time-locked from expired funds (chain facts). The final
+    figure is the honestly spendable part: expired bonds minus frozen
+    ones — a frozen expired bond is excluded from any transaction until
+    unfrozen.
     """
     if summary.branch == FIDELITY_BOND_BRANCH:
         bond_parts: list[str] = []
@@ -281,7 +287,7 @@ def render_branch_summary(summary: BranchSummaryRow) -> str:
         detail = f"{' + '.join(bond_parts)}; " if bond_parts else ""
         return (
             f"Balance: {summary.balance:,} sats "
-            f"({detail}redeemable: {summary.expired_balance:,} sats)"
+            f"({detail}spendable (explicit): {summary.expired_spendable:,} sats)"
         )
     return f"Balance: {summary.balance:,} sats (spendable: {summary.spendable:,} sats)"
 
@@ -296,40 +302,45 @@ def render_mixdepth_summary(summary: MixdepthSummaryRow) -> str:
 def render_legend(*, show_fidelity_bonds: bool = True) -> list[str]:
     """Legend for the three-level vocabulary: tags, states, and the RU! flag.
 
-    ``show_fidelity_bonds=False`` drops the fb-a/fb-x labels and the
-    lock/redeem states — used when the fidelity bond branch is hidden from
-    the page (``wallet.info_show_fidelity_bonds = false``).
+    ``show_fidelity_bonds=False`` drops the fb-a/fb-x tags and the lock
+    state — used when the fidelity bond branch is hidden from the page
+    (``wallet.info_show_fidelity_bonds = false``).
     """
     lines = [
         "",
         colorize("Address legend:", ANSI_BOLD_WHITE),
-        "  tags (what the funds are):",
-        "    new    - Unused, safe for receiving",
+        "  tags (type of address or funds):",
+        "    new    - unused, safe for receiving",
         "    dep    - deposit: address with funds from internal or external sources",
         "    cj-o   - coinjoin output: mixed funds",
         "    cj-c   - coinjoin change: change output from a CoinJoin "
         "(deanonymising, keep separate)",
         "    chg    - change: regular change (not from a CoinJoin)",
-        "    used   - Previously used, now empty (do not reuse)",
+        "    used   - previously used, now empty (do not reuse)",
         "    flag   - flagged: shared with peers but tx failed (do not reuse)",
         '    rsvd   - reserved: previously issued or set aside (label in "quotes"); do not reuse',
     ]
     if show_fidelity_bonds:
         lines += [
             "    fb-a   - fidelity bond active: time-locked until the fb-date",
-            "    fb-x   - fidelity bond expired: past its locktime; redeem before spending",
+            "    fb-x   - fidelity bond expired: past its locktime; spendable only via "
+            "explicit selection (never auto-selected), cannot be used as a CoinJoin input",
         ]
+    # The fb-x exception only makes sense when the bond vocabulary is on
+    # the page; hidden bonds get the plain spend line (no dangling fb-x).
+    spend_line = "    spend  - spendable: usable in any transaction"
+    if show_fidelity_bonds:
+        spend_line += " (except fidelity bonds: see fb-x)"
     lines += [
         "  states (spendability):",
-        "    spend  - spendable: available for coin selection",
-        "    frozn  - frozen: excluded from coin selection (manage with jm-wallet freeze)",
+        spend_line,
+        "    frozn  - frozen: excluded from any transaction (manage with jm-wallet freeze)",
         "    pend   - pending: outgoing transaction involving this address not yet confirmed",
         "    unconf - unconfirmed: UTXO has no confirmations yet",
     ]
     if show_fidelity_bonds:
         lines += [
-            "    lock   - Fidelity bond UTXO still time-locked (until fb-date)",
-            "    redeem - Fidelity bond past its locktime; redeem before spending",
+            "    lock   - fidelity bond UTXO still time-locked (until fb-date)",
         ]
     lines += [
         "  flags:",

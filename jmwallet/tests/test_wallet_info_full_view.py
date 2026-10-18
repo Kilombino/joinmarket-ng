@@ -150,7 +150,7 @@ class TestBranchTable:
         assert all(line.count("|") == 6 for line in data_lines)
 
     def test_snapshot_fidelity_bond_branch(self) -> None:
-        """The bond branch adds lock/redeem state + fb-date, retaining exact confs."""
+        """The bond branch adds lock/spend state + fb-date, retaining exact confs."""
         bonds = [
             _addr(
                 "bc1pbond0",
@@ -187,8 +187,8 @@ class TestBranchTable:
         assert [line.split("|")[3].strip() for line in data_lines] == ["100", ""]
         # /-prefixed derivation index — no locktime epoch glued to a path cell
         assert [line.split("|")[0].strip() for line in data_lines] == ["/0", "/2"]
-        # lock status per row: a funded active bond locks; an empty bond has
-        # no state (nothing to lock or redeem)
+        # bond spendability per row: a funded active bond locks; an empty
+        # bond has no state (nothing to lock or spend)
         assert [line.split("|")[5].strip() for line in data_lines] == ["lock", ""]
 
     @pytest.mark.parametrize("locked", [True, False])
@@ -218,7 +218,7 @@ class TestBranchTable:
             pending_addresses={addr.address} if pending else set(),
         )
         line = info_render.render_branch_table(rows, fidelity_bond=True)[2]
-        state = "pend" if pending else "lock" if locked else "redeem"
+        state = "pend" if pending else "lock" if locked else "spend"
         assert line.split("|")[5].strip() == (f"{state} frozn" if frozen else state)
         assert line.split("|")[3].strip() == "12,345"
 
@@ -411,11 +411,12 @@ class TestSummaryLines:
         summary = summarize_branch(rows, mixdepth=0, branch=2, now=NOW)
         line = info_render.render_branch_summary(summary)
         assert line == (
-            "Balance: 100,000 sats (60,000 time-locked + 40,000 expired; redeemable: 40,000 sats)"
+            "Balance: 100,000 sats (60,000 time-locked + 40,000 expired; "
+            "spendable (explicit): 40,000 sats)"
         )
 
     def test_bond_branch_summary_locked_only(self) -> None:
-        """All funds time-locked: nothing redeemable yet."""
+        """All funds time-locked: nothing spendable (explicitly) yet."""
         rows = build_branch_rows(
             [
                 _addr(
@@ -435,10 +436,10 @@ class TestSummaryLines:
         )
         summary = summarize_branch(rows, mixdepth=0, branch=2, now=NOW)
         line = info_render.render_branch_summary(summary)
-        assert line == "Balance: 60,000 sats (60,000 time-locked; redeemable: 0 sats)"
+        assert line == ("Balance: 60,000 sats (60,000 time-locked; spendable (explicit): 0 sats)")
 
     def test_bond_branch_summary_expired_only(self) -> None:
-        """All funds expired: the full balance is redeemable."""
+        """All funds expired: the full balance is spendable (explicitly)."""
         rows = build_branch_rows(
             [
                 _addr(
@@ -458,7 +459,41 @@ class TestSummaryLines:
         )
         summary = summarize_branch(rows, mixdepth=0, branch=2, now=NOW)
         line = info_render.render_branch_summary(summary)
-        assert line == "Balance: 40,000 sats (40,000 expired; redeemable: 40,000 sats)"
+        assert line == ("Balance: 40,000 sats (40,000 expired; spendable (explicit): 40,000 sats)")
+
+    def test_bond_branch_summary_expired_frozen(self) -> None:
+        """Frozen expired bonds are excluded from the spendable (explicit) figure."""
+        rows = build_branch_rows(
+            [
+                _addr(
+                    "bc1pbond1",
+                    1,
+                    balance=40_000,
+                    status="bond",
+                    is_external=False,
+                    is_bond=True,
+                    locktime=NOW - 86_400,
+                    utxos=[
+                        _utxo("ee" * 32, 0, 15_000, "bc1pbond1", 100, locktime=NOW - 86_400),
+                        _utxo(
+                            "ef" * 32,
+                            1,
+                            25_000,
+                            "bc1pbond1",
+                            100,
+                            frozen=True,
+                            locktime=NOW - 86_400,
+                        ),
+                    ],
+                ),
+            ],
+            mixdepth=0,
+            branch=2,
+            now=NOW,
+        )
+        summary = summarize_branch(rows, mixdepth=0, branch=2, now=NOW)
+        line = info_render.render_branch_summary(summary)
+        assert line == ("Balance: 40,000 sats (40,000 expired; spendable (explicit): 15,000 sats)")
 
     def test_mixdepth_summary_totals(self) -> None:
         ext = summarize_branch(
@@ -522,8 +557,10 @@ class TestLegend:
             "fb-x",
         ):
             assert label in text
-        for state in ("spend", "frozn", "pend", "unconf", "lock", "redeem"):
+        for state in ("spend", "frozn", "pend", "unconf", "lock"):
             assert state in text
+        # unified vocabulary: no "redeem" token anywhere in the legend
+        assert "redeem" not in text
         assert "RU!" in text
         assert "\033[" not in text
 
@@ -531,11 +568,11 @@ class TestLegend:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """``show_fidelity_bonds=False`` drops the fb-a/fb-x tags and the
-        lock/redeem states (hidden bond branch); the rest of the vocabulary
+        lock state (hidden bond branch); the rest of the vocabulary
         stays."""
         monkeypatch.setattr("jmwallet.cli.ansi.color_enabled", lambda: False)
         text = "\n".join(info_render.render_legend(show_fidelity_bonds=False))
-        for gone in ("fb-a", "fb-x", "lock", "redeem", "fb-date"):
+        for gone in ("fb-a", "fb-x", "lock", "fb-date"):
             assert gone not in text
         for kept in (
             "new",

@@ -2142,8 +2142,120 @@ def test_info_uses_default_wallet(monkeypatch):
             )
 
             assert result.exit_code == 0, f"info command failed: {result.stdout}"
-            assert "Total Wallet Balance:" in result.stdout
-            assert "Total Spendable Balance:" in result.stdout
+            assert "Total Wallet Balance" in result.stdout
+            assert "Total Spendable Balance" in result.stdout
+
+
+def test_balance_footer_plain_wallet():
+    """No frozen coins or bonds: total equals spendable, no deduction lines."""
+    from jmwallet.cli.wallet import _balance_footer_lines
+
+    lines = _balance_footer_lines(
+        spendable_balance=100_000,
+        total_frozen=0,
+        fb_balance=0,
+        bond_locked_total=0,
+        expired_frozen=0,
+    )
+    text = "\n".join(lines)
+    assert lines[1] == "Wallet balance calculation"
+    assert lines[2].endswith("100,000 sats  Total Wallet Balance")
+    assert lines[3].endswith("100,000 sats  Total Spendable Balance")
+    assert "Frozen UTXOs" not in text
+    assert "fidelity bonds" not in text
+    assert "thereof" not in text
+
+
+def test_balance_footer_frozen_utxos_deducted():
+    """Frozen non-bond UTXOs appear as their own deduction line."""
+    from jmwallet.cli.wallet import _balance_footer_lines
+
+    lines = _balance_footer_lines(
+        spendable_balance=97_000,
+        total_frozen=3_000,
+        fb_balance=0,
+        bond_locked_total=0,
+        expired_frozen=0,
+    )
+    text = "\n".join(lines)
+    assert lines[2].endswith("100,000 sats  Total Wallet Balance")
+    assert lines[3].startswith("- ")
+    assert lines[3].endswith("3,000 sats  Frozen UTXOs")
+    assert lines[4].startswith("= ")
+    assert lines[4].endswith("97,000 sats  Total Spendable Balance")
+    assert "thereof" not in text
+
+
+def test_balance_footer_expired_bonds_count_as_spendable():
+    """Expired, non-frozen bonds stay in the spendable total and are split
+    out as explicit-selection-only."""
+    from jmwallet.cli.wallet import _balance_footer_lines
+
+    lines = _balance_footer_lines(
+        spendable_balance=162_623,
+        total_frozen=0,
+        fb_balance=44_467,
+        bond_locked_total=24_865,
+        expired_frozen=0,
+    )
+    text = "\n".join(lines)
+    # total = 162,623 + 44,467
+    assert lines[2].endswith("207,090 sats  Total Wallet Balance")
+    assert lines[3].endswith("24,865 sats  fidelity bonds time-locked")
+    # spendable total = 162,623 + 19,602 expired bonds
+    assert lines[4].endswith("182,225 sats  Total Spendable Balance")
+    assert lines[5].endswith("162,623 sats  thereof auto-selectable")
+    assert lines[6].endswith(
+        "19,602 sats  thereof expired fidelity bonds (explicit selection only)"
+    )
+    # markers: deduction vs. total vs. unmarked thereof rows
+    assert lines[3].startswith("- ")
+    assert lines[4].startswith("= ")
+    assert lines[5].startswith("  ")
+    # expired bonds are not deducted like unspendable funds anymore
+    assert "fidelity bonds expired (frozen)" not in text
+
+
+def test_balance_footer_frozen_expired_bonds_deducted():
+    """Frozen expired bonds are excluded from every transaction and shown as
+    their own deduction; only the non-frozen expired part is explicit-only."""
+    from jmwallet.cli.wallet import _balance_footer_lines
+
+    lines = _balance_footer_lines(
+        spendable_balance=162_623,
+        total_frozen=0,
+        fb_balance=44_467,
+        bond_locked_total=24_865,
+        expired_frozen=2_000,
+    )
+    assert lines[3].endswith("24,865 sats  fidelity bonds time-locked")
+    assert lines[4].endswith("2,000 sats  fidelity bonds expired (frozen)")
+    # spendable total = 162,623 + (19,602 - 2,000)
+    assert lines[5].endswith("180,225 sats  Total Spendable Balance")
+    assert lines[6].endswith("162,623 sats  thereof auto-selectable")
+    assert lines[7].endswith(
+        "17,602 sats  thereof expired fidelity bonds (explicit selection only)"
+    )
+
+
+def test_balance_footer_all_expired_bonds_frozen():
+    """When every expired bond is frozen there is no explicit-only part and
+    the thereof split disappears."""
+    from jmwallet.cli.wallet import _balance_footer_lines
+
+    lines = _balance_footer_lines(
+        spendable_balance=100_000,
+        total_frozen=0,
+        fb_balance=19_602,
+        bond_locked_total=0,
+        expired_frozen=19_602,
+    )
+    text = "\n".join(lines)
+    # total = 119,602; spendable total = 100,000
+    assert lines[2].endswith("119,602 sats  Total Wallet Balance")
+    assert lines[3].endswith("19,602 sats  fidelity bonds expired (frozen)")
+    assert lines[4].endswith("100,000 sats  Total Spendable Balance")
+    assert "thereof" not in text
 
 
 # ============================================================================
@@ -3137,7 +3249,7 @@ async def test_info_does_not_issue_addresses_or_change_reservations(
                 mnemonic, settings, extended=extended, reconstruct_history=False
             )
             output = capsys.readouterr().out
-            assert "Total Wallet Balance:" in output
+            assert "Total Wallet Balance" in output
             if not extended:
                 assert "jm-wallet address new <mixdepth>" in output
                 assert expected_next not in output

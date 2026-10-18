@@ -930,6 +930,63 @@ def info(
     )
 
 
+def _balance_footer_lines(
+    spendable_balance: int,
+    total_frozen: int,
+    fb_balance: int,
+    bond_locked_total: int,
+    expired_frozen: int,
+) -> list[str]:
+    """Format the wallet-wide balance footer printed after every info view.
+
+    The footer is a small calculation printed sums-first (amount column on
+    the left, explanation on the right) under a colored title line: from the
+    total wallet balance it subtracts everything that cannot be spent in any
+    transaction (frozen UTXOs, time-locked fidelity bonds, expired bonds that
+    are additionally frozen) and reports the spendable total. That total
+    counts expired, non-frozen fidelity bonds as spendable because they are
+    usable via explicit selection; the ``thereof`` lines split the total into
+    the auto-selectable part and the part that needs explicit selection
+    whenever the latter is non-zero.
+
+    Returns the footer lines including the leading blank line; the caller
+    prints any trailing hint and blank line.
+    """
+    total_balance = spendable_balance + total_frozen + fb_balance
+    expired_spendable = fb_balance - bond_locked_total - expired_frozen
+    spendable_total = spendable_balance + expired_spendable
+
+    # Rows of the calculation: (marker, amount, text). The marker prefixes
+    # the amount so the arithmetic reads top-down (total minus deductions
+    # equals spendable); unmarked rows are the total and the thereof-split.
+    rows: list[tuple[str, int, str]] = [(" ", total_balance, "Total Wallet Balance")]
+    if total_frozen > 0:
+        rows.append(("-", total_frozen, "Frozen UTXOs"))
+    if fb_balance > 0:
+        if bond_locked_total > 0:
+            rows.append(("-", bond_locked_total, "fidelity bonds time-locked"))
+        if expired_frozen > 0:
+            rows.append(("-", expired_frozen, "fidelity bonds expired (frozen)"))
+    rows.append(("=", spendable_total, "Total Spendable Balance"))
+    if expired_spendable > 0:
+        rows.append((" ", spendable_balance, "thereof auto-selectable"))
+        rows.append(
+            (" ", expired_spendable, "thereof expired fidelity bonds (explicit selection only)")
+        )
+
+    # Right-align the amounts so the sats column lines up, sizing the column
+    # to the widest printed amount; the free-text explanations trail after
+    # the sats column and never feed back into its width.
+    amount_width = max(len(f"{amount:,}") for _, amount, _ in rows)
+
+    lines = ["", colorize("Wallet balance calculation", ANSI_BOLD_YELLOW)]
+    for marker, amount, text in rows:
+        line = f"{marker} {amount:>{amount_width},} sats  {text}"
+        # The total line is rendered like the "Mixdepth N" headers.
+        lines.append(colorize(line, ANSI_BOLD_CYAN) if text == "Total Wallet Balance" else line)
+    return lines
+
+
 async def _show_wallet_info(
     mnemonic: str,
     backend_settings: ResolvedBackendSettings,
@@ -1230,84 +1287,33 @@ async def _show_wallet_info(
                 suffix = f" ({', '.join(md_suffix_parts)})" if md_suffix_parts else ""
                 print(f"  Mixdepth {md}: {balance:>{md_balance_width},} sats{suffix}")
 
-        # Show Total Balance with aligned columns and visual calculation
-        unit_suffix = " sats"
-
-        # Calculate total: spendable + frozen + all FBs (locked + expired)
-        total_balance = spendable_balance + total_frozen + fb_balance
-
-        # Split FBs into time-locked (not yet expired) and expired.
+        # Wallet-wide balance footer. Split the fidelity bonds into the parts
+        # the footer treats differently: time-locked bonds cannot be spent at
+        # all; expired bonds are spendable via explicit selection unless they
+        # are additionally frozen.
         bond_locked_total = 0
+        expired_frozen = 0
         if fb_balance > 0:
             import time
 
             current_time = int(time.time())
-            bond_locked_total = sum(
-                u.value
-                for utxos in wallet.utxo_cache.values()
-                for u in utxos
-                if u.is_fidelity_bond and u.locktime and u.locktime > current_time
-            )
-        expired_balance = fb_balance - bond_locked_total
+            for utxos in wallet.utxo_cache.values():
+                for u in utxos:
+                    if not u.is_fidelity_bond:
+                        continue
+                    if u.locktime and u.locktime > current_time:
+                        bond_locked_total += u.value
+                    elif u.frozen:
+                        expired_frozen += u.value
 
-        # Right-align the sums so the ``sats`` column lines up, sizing the
-        # column to the widest printed value (same system as the per-mixdepth
-        # block above) so it stays aligned even for large totals.
-        block_amounts = [
-            a
-            for a in (
-                total_balance,
-                total_frozen,
-                bond_locked_total,
-                expired_balance,
-                spendable_balance,
-            )
-            if a > 0
-        ]
-        block_width = max((len(f"{a:,}") for a in block_amounts), default=0)
-
-        # Size the label column to the widest label actually printed so the
-        # right-aligned sums sit as close to the labels as possible while still
-        # lining up at the ``sats`` column. The longest printed label (e.g. the
-        # time-locked line) then sits with minimal gap and the shorter ones fill
-        # in with extra spacing; labels that are not printed (no time-locked
-        # bonds) do not inflate the column.
-        printed_labels = ["Total Wallet Balance:", "= Total Spendable Balance:"]
-        if total_frozen > 0:
-            printed_labels.append("- Frozen UTXOs:")
-        if fb_balance > 0:
-            printed_labels.append("- Fidelity Bonds Expired:")
-            if bond_locked_total > 0:
-                printed_labels.append("- Fidelity Bonds Time-Locked:")
-        balance_label_width = max(len(label) for label in printed_labels)
-
-        header = colorize(f"{'Total Wallet Balance:':<{balance_label_width}}", ANSI_BOLD_YELLOW)
-        print(f"\n{header}{total_balance:>{block_width},}{unit_suffix}")
-
-        # Subtract frozen UTXOs (not spendable)
-        if total_frozen > 0:
-            print(
-                f"{'- Frozen UTXOs:':<{balance_label_width}}"
-                f"{total_frozen:>{block_width},}{unit_suffix}"
-            )
-
-        # Subtract Fidelity Bonds (locked and expired, not spendable)
-        if fb_balance > 0:
-            if bond_locked_total > 0:
-                print(
-                    f"{'- Fidelity Bonds Time-Locked:':<{balance_label_width}}"
-                    f"{bond_locked_total:>{block_width},}{unit_suffix}"
-                )
-            print(
-                f"{'- Fidelity Bonds Expired:':<{balance_label_width}}"
-                f"{expired_balance:>{block_width},}{unit_suffix}"
-            )
-
-        # Final spendable amount after all deductions
-        print(
-            f"{'= Total Spendable Balance:':<{balance_label_width}}"
-            f"{spendable_balance:>{block_width},}{unit_suffix}"
-        )
+        for line in _balance_footer_lines(
+            spendable_balance,
+            total_frozen,
+            fb_balance,
+            bond_locked_total,
+            expired_frozen,
+        ):
+            print(line)
         # Basic (non-extended) view: point users to how to get a fresh receive
         # address. Printed last so it is the final actionable line of the output.
         if not extended:
@@ -1854,7 +1860,8 @@ def _show_full_wallet_info(
     ``show_fidelity_bonds=False`` (``wallet.info_show_fidelity_bonds``)
     drops the fidelity bond branch; the addresses are still fetched so a
     one-line notice can point at funded hidden bonds instead of hiding
-    them silently, and the legend loses its fb-a/fb-x/lock/redeem rows.
+    them silently, and the legend loses its fb-a/fb-x tags and the lock
+    state row.
     """
     from jmwallet.cli.info_render import (
         BRANCH_NAME_WIDTH,

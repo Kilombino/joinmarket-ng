@@ -260,7 +260,7 @@ def full_view_wallet_with_bonds(full_view_wallet):
 
 class TestFullViewFidelityBonds:
     """The fidelity bond branch of mixdepth 0 renders ahead of the regular
-    branches with its own raster (fb-date, lock/redeem); hiding it via
+    branches with its own raster (fb-date, lock/spend); hiding it via
     ``wallet.info_show_fidelity_bonds = false`` leaves a one-line notice and
     drops the bonds from the totals."""
 
@@ -278,7 +278,7 @@ class TestFullViewFidelityBonds:
         assert out.index("Mixdepth 0") < out.index("fidelity bond addr.")
         assert out.index("fidelity bond addr.") < out.index("external addresses")
 
-        # Own raster: fb-date column, fb-a/fb-x tags, lock/redeem states, and
+        # Own raster: fb-date column, fb-a/fb-x tags, lock/spend states, and
         # exact confirmation counts.
         assert any(line.startswith("idx") and "fb-date" in line for line in out.splitlines())
         active_line = next(line for line in out.splitlines() if _BOND_ACTIVE_ADDR in line)
@@ -287,16 +287,17 @@ class TestFullViewFidelityBonds:
         assert active_line.split("|")[5].strip() == "lock"
         assert active_line.split("|")[3].strip() == "100"
         assert expired_line.split("|")[4].strip() == "fb-x"
-        assert expired_line.split("|")[5].strip() == "redeem"
+        assert expired_line.split("|")[5].strip() == "spend"
         assert expired_line.split("|")[3].strip() == "3"
         assert f"{'d' * 64}:0" in active_line
 
-        # Bonds count toward the mixdepth total but are never spendable; the
-        # branch summary splits time-locked from expired (redeemable) funds.
+        # Bonds count toward the mixdepth total but are never auto-selected;
+        # the branch summary splits time-locked from expired funds and shows
+        # the explicitly spendable figure.
         assert "392,000 sats (spendable: 292,000 sats)" in out
         assert (
             "Balance: 100,000 sats (60,000 time-locked + 40,000 expired; "
-            "redeemable: 40,000 sats)" in out
+            "spendable (explicit): 40,000 sats)" in out
         )
 
         # Every dashed line in the full-view section (page separators and
@@ -326,7 +327,7 @@ class TestFullViewFidelityBonds:
         assert result.exit_code == 0, result.output
         for address, state in (
             (_BOND_ACTIVE_ADDR, "lock frozn"),
-            (_BOND_EXPIRED_ADDR, "redeem frozn"),
+            (_BOND_EXPIRED_ADDR, "spend frozn"),
         ):
             line = next(line for line in result.output.splitlines() if address in line)
             assert line.split("|")[5].strip() == state
