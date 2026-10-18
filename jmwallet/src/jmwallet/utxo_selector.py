@@ -93,6 +93,7 @@ def format_utxo_line(
     allowed_mixdepth: int | None = None,
     min_confirmations: int = 0,
     columns: list[tuple[str, int]] | None = None,
+    allow_fidelity_bonds: bool = True,
 ) -> str:
     """Format a single UTXO row with separate Label and State columns."""
     columns = columns or _table_columns(term_width, [utxo])
@@ -125,7 +126,13 @@ def format_utxo_line(
         "Confs": f"{utxo.confirmations:,}",
         "Outpoint": f"{utxo.txid[:8]}...:{utxo.vout}",
         "Label": label_col,
-        "State": _utxo_state_col(utxo, excluded_outpoints, allowed_mixdepth, min_confirmations),
+        "State": _utxo_state_col(
+            utxo,
+            excluded_outpoints,
+            allowed_mixdepth,
+            min_confirmations,
+            allow_fidelity_bonds=allow_fidelity_bonds,
+        ),
     }
     return _clip(
         _format_cells(values, [(name, size) for name, size in columns if name != "Sel"]) + " |",
@@ -138,11 +145,15 @@ def _utxo_state_col(
     excluded_outpoints: set[tuple[str, int]] | None = None,
     allowed_mixdepth: int | None = None,
     min_confirmations: int = 0,
+    *,
+    allow_fidelity_bonds: bool = True,
 ) -> str:
     """Return the State-column value for a UTXO (also used in the footer).
 
     Priority order: in-use (CoinJoin active) overrides everything, then frozen
-    (user locked), then locked (FB timelock active), then session restrictions.
+    (user locked), then locked (FB timelock active), then ``no-cj`` for any
+    remaining fidelity bond when the caller disallows bonds (CoinJoin
+    context), then session restrictions.
     """
     if excluded_outpoints and (utxo.txid, utxo.vout) in excluded_outpoints:
         return "in-use"
@@ -150,6 +161,8 @@ def _utxo_state_col(
         return "frozen"
     if utxo.is_fidelity_bond and utxo.is_locked:
         return "locked"
+    if utxo.is_fidelity_bond and not allow_fidelity_bonds:
+        return "no-cj"
     if utxo.confirmations < min_confirmations:
         return "immature"
     if allowed_mixdepth is not None and utxo.mixdepth != allowed_mixdepth:
@@ -174,16 +187,25 @@ def _is_base_selectable(
     allowed_mixdepth: int | None,
     min_confirmations: int,
     excluded_outpoints: set[tuple[str, int]] | None = None,
+    *,
+    allow_fidelity_bonds: bool = True,
 ) -> bool:
     """Whether a UTXO may ever be selected in this session.
 
     Frozen UTXOs and still-locked fidelity bonds are never selectable, nor
     are UTXOs below ``min_confirmations`` or outside ``allowed_mixdepth``
-    (when pinned by the caller), or in ``excluded_outpoints``. They are still
-    displayed for context.
+    (when pinned by the caller), or in ``excluded_outpoints``. With
+    ``allow_fidelity_bonds=False`` (CoinJoin context) expired bonds are
+    excluded too. They are still displayed for context.
     """
     return (
-        _utxo_state_col(utxo, excluded_outpoints, allowed_mixdepth, min_confirmations)
+        _utxo_state_col(
+            utxo,
+            excluded_outpoints,
+            allowed_mixdepth,
+            min_confirmations,
+            allow_fidelity_bonds=allow_fidelity_bonds,
+        )
         == "spendable"
     )
 
@@ -226,6 +248,7 @@ def _draw_utxo_rows(
     columns: list[tuple[str, int]],
     pinned: int | None,
     min_confirmations: int,
+    allow_fidelity_bonds: bool = True,
 ) -> None:
     """Draw the visible UTXO rows with separators, marks and colors."""
     prev_address = ""
@@ -262,6 +285,7 @@ def _draw_utxo_rows(
             columns=columns,
             allowed_mixdepth=pinned,
             min_confirmations=min_confirmations,
+            allow_fidelity_bonds=allow_fidelity_bonds,
         )
         prev_address = item.address
 
@@ -278,7 +302,8 @@ def _draw_utxo_rows(
             # Frozen, in-use, or still-locked bonds are red and unselectable.
             attr = curses.color_pair(4) | curses.A_DIM
         elif not is_selectable(i):
-            # Immature, or outside the (pinned) source mixdepth
+            # Immature, outside the (pinned) source mixdepth, or a bond in a
+            # CoinJoin context (no-cj)
             attr = curses.A_DIM
         elif item.is_fidelity_bond:
             # Unlocked FB - magenta (can be spent but should be careful)
@@ -308,6 +333,7 @@ def _build_footer_lines(
     excluded_outpoints: set[tuple[str, int]],
     address_utxo_counts: dict[str, int],
     min_confirmations: int = 0,
+    allow_fidelity_bonds: bool = True,
 ) -> tuple[str, str, str, str]:
     """Build the footer text lines, returning (line1, line2, line4, ru_note).
 
@@ -366,12 +392,23 @@ def _build_footer_lines(
             footer_line4 = f"Label: {cursor_item.label}"
 
         # Keep the state and restriction visible even when a long label is clipped.
-        state_col = _utxo_state_col(cursor_item, excluded_outpoints, pinned, min_confirmations)
+        state_col = _utxo_state_col(
+            cursor_item,
+            excluded_outpoints,
+            pinned,
+            min_confirmations,
+            allow_fidelity_bonds=allow_fidelity_bonds,
+        )
         state_text = f"State: {state_col}"
         if state_col == "immature":
             state_text += f" (requires {min_confirmations} confirmations)"
         elif state_col == "other-md":
             state_text += f" (source is m{pinned})"
+        elif state_col == "no-cj":
+            state_text += (
+                " (fidelity bonds cannot be used in CoinJoins; "
+                "redeem with jm-wallet send --select-utxos)"
+            )
         if footer_line4:
             footer_line4 = f"{state_text} | {footer_line4}"
         else:
@@ -446,6 +483,7 @@ def _run_selector(
     allowed_mixdepth: int | None,
     min_confirmations: int,
     excluded_outpoints: set[tuple[str, int]],
+    allow_fidelity_bonds: bool = True,
 ) -> list[UTXOInfo]:
     """Run the curses-based UTXO selector.
 
@@ -457,6 +495,8 @@ def _run_selector(
         min_confirmations: UTXOs below this many confirmations are unselectable
         excluded_outpoints: In-flight CoinJoin inputs shown as State ``in-use``
             with a ``[-]`` mark; unavailable for selection
+        allow_fidelity_bonds: When ``False`` (CoinJoin context) expired bonds
+            are shown as State ``no-cj`` and cannot be selected
 
     Returns:
         List of selected UTXOs
@@ -480,7 +520,13 @@ def _run_selector(
         i
         for i, item in enumerate(display_items)
         if item is not None
-        and _is_base_selectable(item, allowed_mixdepth, min_confirmations, excluded_outpoints)
+        and _is_base_selectable(
+            item,
+            allowed_mixdepth,
+            min_confirmations,
+            excluded_outpoints,
+            allow_fidelity_bonds=allow_fidelity_bonds,
+        )
     }
     last = len(display_items) - 1
 
@@ -530,6 +576,7 @@ def _run_selector(
                 excluded_outpoints,
                 address_utxo_counts,
                 min_confirmations,
+                allow_fidelity_bonds,
             ),
         )
         list_start = 5
@@ -559,6 +606,7 @@ def _run_selector(
                 columns,
                 pinned,
                 min_confirmations,
+                allow_fidelity_bonds,
             )
             _draw_footer(stdscr, height - len(footer), footer)
         except curses.error:
@@ -644,6 +692,8 @@ def select_utxos_interactive(
     allowed_mixdepth: int | None = None,
     min_confirmations: int = 0,
     excluded_outpoints: set[tuple[str, int]] | None = None,
+    *,
+    allow_fidelity_bonds: bool = True,
 ) -> list[UTXOInfo]:
     """Display an interactive UTXO selector over the whole wallet.
 
@@ -670,6 +720,10 @@ def select_utxos_interactive(
             but unselectable
         excluded_outpoints: In-flight CoinJoin inputs shown as State ``in-use``
             with a ``[-]`` mark; unavailable for selection.
+        allow_fidelity_bonds: Direct sends (the default) may spend expired
+            fidelity bonds. CoinJoin callers pass ``False`` so every bond is
+            shown as State ``no-cj`` with a ``[-]`` mark: bond inputs would
+            be disclosed to makers and then rejected at signing.
 
     Returns:
         List of selected UTXOs (all from one mixdepth), empty if cancelled
@@ -688,7 +742,11 @@ def select_utxos_interactive(
         if len(utxos) == 1:
             utxo = utxos[0]
             if not _is_base_selectable(
-                utxo, allowed_mixdepth, min_confirmations, excluded_outpoints
+                utxo,
+                allowed_mixdepth,
+                min_confirmations,
+                excluded_outpoints,
+                allow_fidelity_bonds=allow_fidelity_bonds,
             ):
                 return []
             return utxos
@@ -705,4 +763,5 @@ def select_utxos_interactive(
         allowed_mixdepth,
         min_confirmations,
         excluded_outpoints,
+        allow_fidelity_bonds,
     )

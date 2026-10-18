@@ -396,6 +396,77 @@ class TestBaseSelectability:
         assert _is_base_selectable(_make_utxo(1), 1, 0) is True
 
 
+def _expired_bond(mixdepth: int = 0) -> UTXOInfo:
+    bond = _make_utxo(mixdepth, locktime=1)  # 1970, expired
+    bond.scriptpubkey = "0020" + "ff" * 32
+    return bond
+
+
+class TestCoinJoinContextBonds:
+    """``allow_fidelity_bonds=False`` (CoinJoin callers) excludes every bond.
+
+    Direct sends keep the default (``True``) so expired bonds stay redeemable.
+    """
+
+    def test_expired_bond_not_selectable(self) -> None:
+        assert _is_base_selectable(_expired_bond(), None, 0, allow_fidelity_bonds=False) is False
+
+    def test_expired_bond_state_is_no_cj(self) -> None:
+        assert utxo_selector._utxo_state_col(_expired_bond(), allow_fidelity_bonds=False) == "no-cj"
+
+    def test_locked_bond_state_stays_locked(self) -> None:
+        locked = _make_utxo(0, locktime=4_000_000_000)
+        assert utxo_selector._utxo_state_col(locked, allow_fidelity_bonds=False) == "locked"
+
+    def test_frozen_bond_state_stays_frozen(self) -> None:
+        frozen = _expired_bond()
+        frozen.frozen = True
+        assert utxo_selector._utxo_state_col(frozen, allow_fidelity_bonds=False) == "frozen"
+
+    def test_regular_utxo_unaffected(self) -> None:
+        assert _is_base_selectable(_make_utxo(0), None, 0, allow_fidelity_bonds=False) is True
+        assert utxo_selector._utxo_state_col(_make_utxo(0), allow_fidelity_bonds=False) == (
+            "spendable"
+        )
+
+    def test_default_keeps_expired_bond_selectable(self) -> None:
+        # Send/redeem path contract: unchanged.
+        assert _is_base_selectable(_expired_bond(), None, 0) is True
+        assert utxo_selector._utxo_state_col(_expired_bond()) == "spendable"
+
+    def test_row_state_column_shows_no_cj(self) -> None:
+        line = format_utxo_line(_expired_bond(), allow_fidelity_bonds=False)
+        assert "no-cj" in line
+        assert "FB-expired" in line
+
+    def test_footer_explains_no_cj(self) -> None:
+        bond = _expired_bond()
+        _, _, status, _ = utxo_selector._build_footer_lines(
+            [bond],
+            set(),
+            set(),
+            lambda _i: False,
+            0,
+            None,
+            None,
+            0,
+            set(),
+            {},
+            0,
+            allow_fidelity_bonds=False,
+        )
+        assert status.startswith("State: no-cj (fidelity bonds cannot be used in CoinJoins")
+        assert "jm-wallet send --select-utxos" in status
+        assert "Expired Fidelity Bond" in status
+
+    def test_single_expired_bond_not_auto_selected_non_tty(self) -> None:
+        """Non-TTY single-UTXO shortcut must not hand a bond to a CoinJoin."""
+        assert select_utxos_interactive([_expired_bond()], allow_fidelity_bonds=False) == []
+        # Send path: still auto-selected.
+        bond = _expired_bond()
+        assert select_utxos_interactive([bond]) == [bond]
+
+
 class TestMixdepthPinningNonTTY:
     """Non-TTY fallback honors allowed_mixdepth and min_confirmations."""
 

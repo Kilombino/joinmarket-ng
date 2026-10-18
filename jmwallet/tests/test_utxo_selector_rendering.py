@@ -154,6 +154,7 @@ def _run(
     allowed_mixdepth: int | None = None,
     min_confirmations: int = 0,
     excluded_outpoints: set[tuple[str, int]] | None = None,
+    allow_fidelity_bonds: bool = True,
 ) -> list[UTXOInfo]:
     display_items = build_display_items(sorted(utxos, key=utxo_sort_key))
     result = utxo_selector._run_selector(
@@ -163,6 +164,7 @@ def _run(
         allowed_mixdepth,
         min_confirmations,
         excluded_outpoints or set(),
+        allow_fidelity_bonds,
     )
     assert screen.pending_events == 0
     return result
@@ -486,6 +488,54 @@ def test_select_all_and_deselect_all_respect_gates_then_unpin_mixdepth(
     selected_frame = screen.frames[1]
     for state in ("frozen", "locked", "in-use", "immature"):
         assert state in selected_frame.text
+
+
+def test_coinjoin_context_blocks_expired_bond_from_toggle_and_select_all(
+    patched_selector_curses: None,
+) -> None:
+    """With allow_fidelity_bonds=False an expired bond is no-cj: Space and s skip it."""
+    height = 32
+    width = 160
+    coin = _utxo("a", mixdepth=0, value=20_000)
+    expired_bond = _utxo("b", mixdepth=0, value=50_000, locktime=1)
+    expired_bond.scriptpubkey = "0020" + "b" * 64
+    screen = StrictScreen(
+        height,
+        width,
+        [
+            _event(height, width, ord("j")),  # cursor onto the bond
+            _event(height, width, ord(" ")),  # toggle attempt
+            _event(height, width, ord("s")),  # select all in mixdepth
+            _event(height, width, ord("\n")),
+        ],
+    )
+
+    assert _run(screen, [coin, expired_bond], allow_fidelity_bonds=False) == [coin]
+
+    bond_frame = _frame_with(screen.frames, "State: no-cj")
+    bond_row = _line_with(bond_frame, "bbbbbbbb")
+    assert "[-]" in bond_row
+    assert "no-cj" in bond_row
+    assert "FB-expired" in bond_row
+    assert "fidelity bonds cannot be used in CoinJoins" in bond_frame.text
+    assert "Selected: 1/1" in screen.frames[-1].text
+
+
+def test_send_context_keeps_expired_bond_selectable(patched_selector_curses: None) -> None:
+    """Default allow_fidelity_bonds=True: the redeem path can still pick an expired bond."""
+    height = 32
+    width = 160
+    expired_bond = _utxo("b", mixdepth=0, value=50_000, locktime=1)
+    expired_bond.scriptpubkey = "0020" + "b" * 64
+    screen = StrictScreen(
+        height,
+        width,
+        [_event(height, width, ord(" ")), _event(height, width, ord("\n"))],
+    )
+
+    assert _run(screen, [expired_bond]) == [expired_bond]
+    assert "State: spendable" in screen.frames[0].text
+    assert "no-cj" not in screen.frames[0].text
 
 
 @pytest.mark.parametrize(
