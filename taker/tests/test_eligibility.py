@@ -13,6 +13,7 @@ from taker.eligibility import (
     podle_threshold_met,
     selectable_for_interactive,
 )
+from taker.podle import get_eligible_podle_utxos, select_podle_utxo
 
 SPK = "0014" + "00" * 20
 
@@ -136,6 +137,22 @@ def test_fidelity_bond_inputs_flags_locktime_and_p2wsh() -> None:
 
     assert flagged == [expired_bond, locked_bond, p2wsh_without_locktime]
     assert fidelity_bond_inputs([regular]) == []
+
+
+def test_podle_candidates_exclude_bonds_and_p2wsh() -> None:
+    """A bond must never be the PoDLE UTXO revealed to makers in !auth."""
+    past = int(time.time()) - 100_000
+    regular = _utxo(txid_char="a", value=25_000_000)
+    expired_bond = _utxo(txid_char="b", value=50_000_000, locktime=past)
+    p2wsh = _utxo(txid_char="c", value=50_000_000)
+    p2wsh.scriptpubkey = "0020" + "cc" * 32
+
+    eligible = get_eligible_podle_utxos(
+        [regular, expired_bond, p2wsh], cj_amount=10_000_000, min_confirmations=5
+    )
+
+    assert eligible == [regular]
+    assert select_podle_utxo([expired_bond, p2wsh], cj_amount=10_000_000) is None
 
 
 def test_selectable_for_interactive_excludes_in_flight_inputs() -> None:

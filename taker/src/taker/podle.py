@@ -125,13 +125,23 @@ def get_eligible_podle_utxos(
     Criteria:
     - Must have at least min_confirmations
     - Must be at least min_percent of cj_amount
+    - Must not be a fidelity bond (P2WSH); a PoDLE commits to a P2WPKH
+      pubkey and makers verify the revealed UTXO's script against it, so a
+      bond would be disclosed in ``!auth`` and then rejected.
 
     Returns:
         List of eligible UTXOs sorted by (confirmations, value) descending
     """
     min_value = int(cj_amount * min_percent / 100)
 
-    eligible = [u for u in utxos if u.confirmations >= min_confirmations and u.value >= min_value]
+    eligible = [
+        u
+        for u in utxos
+        if u.confirmations >= min_confirmations
+        and u.value >= min_value
+        and not u.is_fidelity_bond
+        and not u.is_p2wsh
+    ]
 
     # Prefer older UTXOs with more value
     eligible.sort(key=lambda u: (u.confirmations, u.value), reverse=True)
