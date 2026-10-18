@@ -540,10 +540,11 @@ def _render_freeze_screen(
     stdscr.addstr(4, 0, "-" * min(len(_FREEZE_COL_HEADER) + 5, width - 1))
 
     list_start = 5  # Data starts here (+1 blank line under the header rule)
-    # The footer needs one extra row when fidelity bonds are present (they get
-    # their own stats line; bond count cannot change during the session).
+    # Reserve the footer separator, stats, legend, and error line before
+    # sizing the scrollable list. Bonds need a second stats line.
     has_bonds = any(u is not None and u.is_fidelity_bond for u in display_items)
-    list_height = height - 7 if has_bonds else height - 6
+    separator_row = height - (5 if has_bonds else 4)
+    list_height = separator_row - list_start
 
     # Keep the cursor on screen.
     scroll_offset = adjust_scroll(cursor_pos, scroll_offset, list_height)

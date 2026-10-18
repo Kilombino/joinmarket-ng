@@ -1580,6 +1580,54 @@ class TestFreezeCursorNavigation:
         assert _seek_selectable(items, 0, 1) == 0
 
 
+@pytest.mark.parametrize("height", [12, 24, 40])
+@pytest.mark.parametrize("has_bonds", [False, True])
+@pytest.mark.parametrize("cursor_pos", [0, 14, 20])
+def test_freeze_viewport_keeps_selected_utxo_above_footer(
+    height: int, has_bonds: bool, cursor_pos: int
+) -> None:
+    import curses
+
+    from jmwallet.cli.freeze import _render_freeze_screen
+
+    utxos = [
+        UTXOInfo(
+            txid=f"{index + 1:064x}",
+            vout=0,
+            value=100_000,
+            address=f"bcrt1qviewport{index}",
+            confirmations=10,
+            scriptpubkey="0014" + "11" * 20,
+            path=f"m/84'/1'/0'/0/{index}",
+            mixdepth=0,
+        )
+        for index in range(21)
+    ]
+    if has_bonds:
+        utxos[-1].locktime = 1
+        utxos[-1].scriptpubkey = "0020" + "22" * 32
+        utxos[-1].path = "m/84'/1'/0'/2/0"
+
+    screen = MagicMock()
+    screen.getmaxyx.return_value = (height, 160)
+    with patch("curses.color_pair", return_value=0):
+        scroll_offset, list_height = _render_freeze_screen(
+            screen, utxos, cursor_pos, 0, None, False
+        )
+
+    separator_row = height - (5 if has_bonds else 4)
+    assert list_height == separator_row - 5
+    assert scroll_offset <= cursor_pos < scroll_offset + list_height
+
+    selected_rows = [
+        call.args[0]
+        for call in screen.addstr.call_args_list
+        if len(call.args) == 4 and call.args[3] & curses.A_REVERSE
+    ]
+    assert selected_rows == [5 + cursor_pos - scroll_offset]
+    assert 5 <= selected_rows[0] < separator_row
+
+
 class TestFreezeFooterStats:
     """Tests for the freeze-TUI footer statistics lines.
 
