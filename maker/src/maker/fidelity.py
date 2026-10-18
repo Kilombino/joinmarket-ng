@@ -61,6 +61,13 @@ def _has_presigned_certificate(bond: FidelityBondInfo) -> bool:
     )
 
 
+def fidelity_bond_proof_mode(bond: FidelityBondInfo) -> str:
+    """Describe how proofs for this bond will be signed, for a one-time startup log."""
+    if _has_presigned_certificate(bond):
+        return "pre-signed certificate (cold wallet)"
+    return "delegated certificate (hot wallet)"
+
+
 def ensure_fidelity_bond_certificate_valid(
     bond: FidelityBondInfo,
     current_block_height: int,
@@ -397,10 +404,6 @@ def create_fidelity_bond_proof(
             cert_expiry_encoded = bond.cert_expiry
             utxo_pub = bond.pubkey
 
-            logger.debug(
-                f"Using certificate mode for bond proof (cert_expiry={cert_expiry_encoded})"
-            )
-
             # Sign nick message with hot wallet cert_privkey
             nick_msg = (taker_nick + "|" + maker_nick).encode("ascii")
             nick_sig = _sign_message_bitcoin(bond.cert_privkey, nick_msg)
@@ -431,10 +434,6 @@ def create_fidelity_bond_proof(
             cert_expiry_encoded = (
                 (current_block_height + BLOCK_COUNT_SAFETY) // RETARGET_INTERVAL
             ) + CERT_MAX_VALIDITY_TIME
-
-            logger.debug(
-                f"Using delegated cert mode for bond proof (cert_expiry={cert_expiry_encoded})"
-            )
 
             # 1. Nick signature: signed with the cert key (proves maker holds delegated key)
             # Signs "(taker_nick|maker_nick)" using Bitcoin message format

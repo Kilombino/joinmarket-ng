@@ -54,6 +54,7 @@ from maker.fidelity import (
     FidelityBondInfo,
     create_fidelity_bond_proof,
     ensure_fidelity_bond_certificate_valid,
+    fidelity_bond_proof_mode,
     find_fidelity_bonds,
     get_best_fidelity_bond,
 )
@@ -1219,6 +1220,11 @@ class MakerBot(BackgroundTasksMixin, ProtocolHandlersMixin, DirectConnectionMixi
                     f"Fidelity bond found: {self.fidelity_bond.txid[:16]}..., "
                     f"value={self.fidelity_bond.value:,} sats, "
                     f"bond_value={self.fidelity_bond.bond_value:,}"
+                )
+                # Logged once here; the mode never changes while running, so
+                # per-proof logging would only repeat a static fact.
+                logger.info(
+                    f"Fidelity bond proofs use {fidelity_bond_proof_mode(self.fidelity_bond)} mode"
                 )
                 md0_utxos = _get_fidelity_bond_linkable_utxos(
                     self.wallet,

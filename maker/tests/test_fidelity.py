@@ -23,6 +23,7 @@ from maker.fidelity import (
     _sign_message_bitcoin,
     create_fidelity_bond_proof,
     ensure_fidelity_bond_certificate_valid,
+    fidelity_bond_proof_mode,
     find_fidelity_bonds,
     get_best_fidelity_bond,
 )
@@ -918,6 +919,52 @@ class TestGetBestFidelityBond:
             pytest.raises(ExpiredFidelityBondCertificateError),
         ):
             await get_best_fidelity_bond(MagicMock(), current_block_height=450 * 2016)
+
+
+class TestProofModeLogging:
+    """Proof mode is a static fact: reported once at startup, never per proof."""
+
+    @staticmethod
+    def _hot_bond(test_private_key, test_pubkey) -> FidelityBondInfo:
+        return FidelityBondInfo(
+            txid="e" * 64,
+            vout=0,
+            value=50_000_000,
+            locktime=2_000_000_000,
+            confirmation_time=1_700_000_000,
+            bond_value=25_000,
+            pubkey=test_pubkey,
+            private_key=test_private_key,
+        )
+
+    def test_proof_mode_description(self, test_private_key, test_pubkey):
+        hot = self._hot_bond(test_private_key, test_pubkey)
+        cold = TestCertificateValidity._presigned_bond(test_private_key, test_pubkey)
+
+        assert "delegated" in fidelity_bond_proof_mode(hot)
+        assert "pre-signed" in fidelity_bond_proof_mode(cold)
+
+    @pytest.mark.parametrize("mode", ["hot", "cold"])
+    def test_create_proof_emits_no_debug_or_higher_records(
+        self, mode, test_private_key, test_pubkey
+    ):
+        if mode == "hot":
+            bond = self._hot_bond(test_private_key, test_pubkey)
+        else:
+            bond = TestCertificateValidity._presigned_bond(test_private_key, test_pubkey)
+        records: list[str] = []
+        handler_id = logger.add(
+            lambda message: records.append(message.record["level"].name), level="DEBUG"
+        )
+        try:
+            proof = create_fidelity_bond_proof(
+                bond=bond, maker_nick="J5maker", taker_nick="J5taker", current_block_height=100
+            )
+        finally:
+            logger.remove(handler_id)
+
+        assert proof is not None
+        assert records == []
 
 
 class TestConstants:
