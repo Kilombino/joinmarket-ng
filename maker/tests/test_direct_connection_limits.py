@@ -400,3 +400,84 @@ async def test_network_mismatch_closes_socket_and_frees_slot(bot: MakerBot) -> N
     assert connection.close.await_count == 2
     # The loop stopped after the handshake: the second line was never consumed.
     assert connection.is_connected.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_post_handshake_flood_is_closed_with_bounded_logging(
+    bot: MakerBot, captured_logs: list[tuple[str, str]]
+) -> None:
+    """A handshaked socket that floods past the token bucket is closed, not just throttled."""
+    bot.running = True
+    peer = NickIdentity(JM_VERSION)
+    burst = bot._direct_connection_rate_limiter.message_burst
+    # Handshake consumes one token; the rest of the burst is admitted and then
+    # every further line is rejected by the bucket until the close bound.
+    flood = [_handshake(peer.nick)] + [b"junk"] * 500
+    connection = _scripted_connection(flood)
+
+    await bot._on_direct_connection(connection, "flooder:1")
+
+    expected_reads = burst + direct_connection._MAX_RATE_LIMITED_DROPS
+    assert connection.is_connected.call_count == expected_reads
+    assert connection not in bot.generations[0].direct_connection_states
+    connection.close.assert_awaited_once_with()
+
+    flood_records = [
+        (level, message)
+        for level, message in captured_logs
+        if "Rate limiting direct-connection message flood" in message
+        or "Rate limiting message from" in message
+    ]
+    assert flood_records
+    assert all(level == "DEBUG" for level, _ in flood_records)
+    # One non-sensitive and one sensitive record per rate-limit window, not per line.
+    assert len(flood_records) <= 2
+    # The admitted junk lines log one rate-limited parse failure, not one per line.
+    warnings = [m for level, m in captured_logs if level == "WARNING"]
+    assert len(warnings) <= 1
+
+
+@pytest.mark.asyncio
+async def test_rate_limited_drops_are_not_penalized_after_reconnect(bot: MakerBot) -> None:
+    """Closing a flooding socket records nothing against the peer's nick.
+
+    A new socket arrives on a new source port (Tor assigns one per stream), so
+    it also gets a fresh token bucket.
+    """
+    bot.running = True
+    peer = NickIdentity(JM_VERSION)
+    flood = _scripted_connection([_handshake(peer.nick)] + [b"junk"] * 500)
+    await bot._on_direct_connection(flood, "peer:1")
+    flood.close.assert_awaited_once_with()
+
+    reconnect = _scripted_connection(
+        [_handshake(peer.nick), _signed_message(peer, bot.nick, "fill", "payload")]
+    )
+    bot._handle_fill = AsyncMock()
+
+    await bot._on_direct_connection(reconnect, "peer:2")
+
+    reconnect.send.assert_awaited_once()  # handshake reply
+    bot._handle_fill.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_nick_mismatch_warnings_are_rate_limited(
+    bot: MakerBot, captured_logs: list[tuple[str, str]]
+) -> None:
+    """Signed messages claiming another nick on a verified socket log once per window."""
+    bot.running = True
+    peer = NickIdentity(JM_VERSION)
+    impostor = NickIdentity(JM_VERSION)
+    messages = [
+        _handshake(peer.nick),
+        _signed_message(peer, bot.nick, "fill", "payload"),
+    ] + [_signed_message(impostor, bot.nick, "fill", "payload")] * 10
+    connection = _scripted_connection(messages)
+    bot._handle_fill = AsyncMock()
+
+    await bot._on_direct_connection(connection, "peer:1")
+
+    bot._handle_fill.assert_awaited_once()
+    mismatch = [m for level, m in captured_logs if "Dropping verified direct message" in m]
+    assert len(mismatch) == 1

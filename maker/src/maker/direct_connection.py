@@ -44,6 +44,13 @@ _DIRECT_CONNECTION_UNAUTHENTICATED_TIMEOUT_SEC = 60.0
 # bound in about a second under the per-socket token bucket.
 _MAX_PREHANDSHAKE_DROPS = 5
 _PREHANDSHAKE_LOG_INTERVAL_SEC = 10.0
+# Lines rejected by the per-socket token bucket (20 burst, 5/s sustained). A
+# conforming peer sends a few lines per CoinJoin round, so it never reaches
+# this bound; a flood reaches it within a second. Closing bounds the per-line
+# work (bucket check plus throttled logging) an attacker can extract from a
+# single rendezvous circuit.
+_MAX_RATE_LIMITED_DROPS = 50
+_FLOOD_LOG_INTERVAL_SEC = 10.0
 
 
 @dataclass(slots=True)
@@ -54,15 +61,17 @@ class DirectConnectionState:
     This favors availability after a forged preclaim without allowing one socket
     to act as multiple verified identities.
 
-    ``prehandshake_drops`` counts lines received before any accepted handshake.
-    It is per socket by design: closing a socket records nothing against the
-    peer, so a reconnecting client starts clean. Tor's intro-point rate limiting
-    and PoW are the layer that makes reconnect floods expensive.
+    ``prehandshake_drops`` counts lines received before any accepted handshake
+    and ``rate_limited_drops`` counts lines rejected by the per-socket token
+    bucket. Both are per socket by design: closing a socket records nothing
+    against the peer, so a reconnecting client starts clean. Tor's intro-point
+    rate limiting and PoW are the layer that makes reconnect floods expensive.
     """
 
     nick: str | None = None
     verified: bool = False
     prehandshake_drops: int = 0
+    rate_limited_drops: int = 0
 
 
 async def _handle_direct_public_message(
@@ -133,8 +142,31 @@ async def _process_direct_message(
         return False
 
     if not bot._direct_connection_rate_limiter.check_message(peer_str):
-        logger.debug("Rate limiting direct-connection message flood")
-        logger.bind(sensitive=True).debug(f"Rate limiting message from {peer_str} (message flood)")
+        # A flood can push thousands of lines per second through this branch,
+        # so neither the log nor the socket may scale with the line count.
+        state.rate_limited_drops += 1
+        bot._log_rate_limited(
+            f"direct_flood:{peer_str}",
+            "Rate limiting direct-connection message flood",
+            level="debug",
+            interval=_FLOOD_LOG_INTERVAL_SEC,
+        )
+        bot._log_rate_limited(
+            f"direct_flood_sensitive:{peer_str}",
+            f"Rate limiting message from {peer_str} (message flood)",
+            level="debug",
+            interval=_FLOOD_LOG_INTERVAL_SEC,
+            sensitive=True,
+        )
+        if state.rate_limited_drops >= _MAX_RATE_LIMITED_DROPS:
+            logger.debug(
+                f"Closing direct connection after {state.rate_limited_drops} rate-limited messages"
+            )
+            logger.bind(sensitive=True).debug(
+                f"Closing direct connection from {peer_str} after "
+                f"{state.rate_limited_drops} rate-limited messages"
+            )
+            return False
         return True
 
     if state.verified:
@@ -205,8 +237,10 @@ async def _process_direct_message(
 
     if command.startswith("PUBLIC:"):
         if sender_nick != state.nick:
-            logger.warning(
-                f"Dropping direct message claiming {sender_nick} on {state.nick}'s connection"
+            bot._log_rate_limited(
+                f"direct_nick_mismatch:{peer_str}",
+                f"Dropping direct message claiming {sender_nick} on {state.nick}'s connection",
+                interval=_FLOOD_LOG_INTERVAL_SEC,
             )
             return True
         return await _handle_direct_public_message(
@@ -222,8 +256,10 @@ async def _process_direct_message(
 
     if state.verified:
         if sender_nick != state.nick:
-            logger.warning(
-                f"Dropping verified direct message from {sender_nick} on {state.nick}'s connection"
+            bot._log_rate_limited(
+                f"direct_nick_mismatch:{peer_str}",
+                f"Dropping verified direct message from {sender_nick} on {state.nick}'s connection",
+                interval=_FLOOD_LOG_INTERVAL_SEC,
             )
             return True
     else:
