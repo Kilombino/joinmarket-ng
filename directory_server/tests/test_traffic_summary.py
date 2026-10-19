@@ -53,3 +53,30 @@ def test_summary_reports_window_counts_once(server: DirectoryServer) -> None:
     first, second = (message for _, message in records)
     assert "relayed=7" in first and "unknown_target=3" in first and "rate_limit_drops=5" in first
     assert "relayed=0" in second and "rate_limit_drops=4" in second
+
+
+def test_summary_keeps_drops_of_closed_connections() -> None:
+    settings = DirectoryServerSettings(
+        host="127.0.0.1", port=0, max_peers=10, message_rate_limit=1, message_burst_limit=1
+    )
+    server = DirectoryServer(settings, NetworkType.MAINNET, "J5TestNickOOOOOO")
+    limiter = server.rate_limiter
+    for _ in range(4):
+        limiter.check("honest")
+    server.log_traffic_summary()
+
+    # A flooding connection closes before the next summary, and so does the
+    # connection that set the baseline.
+    for _ in range(51):
+        limiter.check("flooder")
+    limiter.remove_peer("flooder")
+    limiter.remove_peer("honest")
+
+    records, handler = _capture()
+    try:
+        server.log_traffic_summary()
+    finally:
+        logger.remove(handler)
+
+    assert len(records) == 1
+    assert "rate_limit_drops=50" in records[0][1]
