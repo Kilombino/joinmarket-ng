@@ -126,6 +126,7 @@ class RateLimiter:
         self.disconnect_threshold = disconnect_threshold
         self._buckets: dict[str, TokenBucket] = {}
         self._violation_counts: dict[str, int] = {}
+        self._removed_peer_violations = 0
 
     def check(self, peer_key: str) -> tuple[RateLimitAction, float]:
         """
@@ -164,11 +165,15 @@ class RateLimiter:
     def remove_peer(self, peer_key: str) -> None:
         """Remove rate limit state for a disconnected peer."""
         self._buckets.pop(peer_key, None)
-        self._violation_counts.pop(peer_key, None)
+        self._removed_peer_violations += self._violation_counts.pop(peer_key, 0)
 
     def get_violation_count(self, peer_key: str) -> int:
         """Get the number of rate limit violations for a peer."""
         return self._violation_counts.get(peer_key, 0)
+
+    def get_recorded_violations(self) -> int:
+        """Violations recorded since start, including those of removed peers."""
+        return self._removed_peer_violations + sum(self._violation_counts.values())
 
     def get_delay_for_peer(self, peer_key: str) -> float:
         """Get recommended delay in seconds for a rate-limited peer."""
@@ -211,3 +216,4 @@ class RateLimiter:
         """Clear all rate limit state."""
         self._buckets.clear()
         self._violation_counts.clear()
+        self._removed_peer_violations = 0

@@ -173,7 +173,7 @@ class DirectoryServer:
 
     def log_traffic_summary(self) -> None:
         counts = self.message_router.take_privmsg_counts()
-        total_violations = self.rate_limiter.get_stats()["total_violations"]
+        total_violations = self.rate_limiter.get_recorded_violations()
         violations = max(0, total_violations - self._summarized_rate_limit_violations)
         self._summarized_rate_limit_violations = total_violations
         if not counts.any() and not violations:
