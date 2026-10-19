@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.1] - 2026-10-19
+
+Small fix in directory traffic stats and in flatpak build CI.
+
+### Fixed
+
+- Directory traffic summaries count rate-limit drops from connections that closed during the window ([4bb5c15e](../../commit/4bb5c15e293a78dd6f986812b2927872db62f51e))
+
+### Configuration Changes
+
+This release did not change the bundled `config.toml.template`.
+
 ## [0.42.0] - 2026-10-19
 
 Fix log flooding caused by a new DoS attack, and harden DoS resistance. New opt-in `--view full` layout for `jm-wallet info --extended` with a pipe-table layout, compact status vocabulary, and a dedicated fidelity-bond table. Alognside dependency updates, new configuration options, and several bug fixes.
@@ -4519,7 +4531,8 @@ This release did not change the bundled `config.toml.template`.
 - Pre-built image support for directory server compose.
 - Tor configuration instructions.
 
-[Unreleased]: ../../compare/0.42.0...HEAD
+[Unreleased]: ../../compare/0.42.1...HEAD
+[0.42.1]: ../../compare/0.42.0...0.42.1
 [0.42.0]: ../../compare/0.41.0...0.42.0
 [0.41.0]: ../../compare/0.40.0...0.41.0
 [0.40.0]: ../../compare/0.39.2...0.40.0
