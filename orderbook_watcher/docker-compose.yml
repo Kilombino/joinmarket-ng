@@ -24,6 +24,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     depends_on:
       tor:
         condition: service_healthy
@@ -52,6 +53,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+        compress: "true"
     healthcheck:
       test: ["CMD", "bash", "-c", "timeout 2 bash -c '</dev/tcp/127.0.0.1/9050' 2>/dev/null"]
       interval: 30s

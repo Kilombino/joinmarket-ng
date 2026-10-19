@@ -55,6 +55,7 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+        compress: "true"
     healthcheck:
       interval: 10s
       timeout: 10s
@@ -104,6 +105,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+        compress: "true"
     entrypoint: ["/bin/sh", "/scripts/regtest-miner.sh"]
     environment:
       - RPC_HOST=jm-bitcoin
@@ -134,6 +136,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -175,6 +178,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -218,6 +222,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -256,6 +261,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -349,6 +355,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     environment:
       - BITCOIN__BACKEND_TYPE=descriptor_wallet
       - BITCOIN__RPC_URL=http://jm-bitcoin:18443
@@ -398,6 +405,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -452,6 +460,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     environment:
       - NETWORK_CONFIG__NETWORK=testnet
       - NETWORK_CONFIG__BITCOIN_NETWORK=regtest
@@ -504,6 +513,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -552,6 +562,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -608,6 +619,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+        compress: "true"
     entrypoint: ["/bin/sh", "/scripts/fund-test-wallets.sh"]
     environment:
       - RPC_HOST=jm-bitcoin
@@ -644,6 +656,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -712,6 +725,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -778,6 +792,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -844,6 +859,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -907,6 +923,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -973,6 +990,7 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+        compress: "true"
     healthcheck:
       interval: 10s
       timeout: 10s
@@ -1019,6 +1037,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+        compress: "true"
     entrypoint: ["/bin/sh", "/scripts/regtest-miner-jam.sh"]
     environment:
       - RPC_HOST=jm-bitcoin-jam
@@ -1088,6 +1107,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+        compress: "true"
     healthcheck:
       # Verify Tor has bootstrapped AND the cookie file is fully written (32 bytes).
       # The cookie file is required by makers/takers to authenticate to the control port.
@@ -1177,6 +1197,7 @@ services:
       options:
         max-size: "100m"
         max-file: "5"
+        compress: "true"
     environment:
       - JOINMARKET_DATA_DIR=/root/.joinmarket-ng
       - JM_RPC_HOST=jm-bitcoin-jam
@@ -1236,6 +1257,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     environment:
       - JOINMARKET_DATA_DIR=/root/.joinmarket-ng
       - JM_RPC_HOST=jm-bitcoin-jam
@@ -1289,6 +1311,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     environment:
       - JOINMARKET_DATA_DIR=/root/.joinmarket-ng
       - JM_RPC_HOST=jm-bitcoin-jam
@@ -1344,6 +1367,7 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+        compress: "true"
     environment:
       - NETWORK=regtest
       - LISTEN_ADDR=0.0.0.0:8334
@@ -1389,6 +1413,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
@@ -1438,6 +1463,7 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+        compress: "true"
     deploy:
       resources:
         limits:
