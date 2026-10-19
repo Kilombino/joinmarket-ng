@@ -52,6 +52,17 @@ def test_manifest_builds_recovery_enabled_libsecp256k1() -> None:
     assert "-DSECP256K1_BUILD_EXHAUSTIVE_TESTS=ON" in secp_module["config-opts"]
 
 
+def test_manifest_builds_tor_with_proof_of_work() -> None:
+    """Tor accepts the maker's PoW request even without the module, so the build must verify it."""
+    manifest = _manifest()
+    tor_module = next(
+        module for module in manifest["modules"] if module["name"] == "tor"
+    )
+
+    assert "--enable-gpl" in tor_module["config-opts"]
+    assert any("pow: yes" in step for step in tor_module["post-install"])
+
+
 def test_manifest_build_and_runtime_share_the_python_path() -> None:
     manifest = _manifest()
     application = next(

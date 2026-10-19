@@ -66,6 +66,13 @@ modules:
   # =========================================================================
   - name: tor
     buildsystem: autotools
+    # --enable-gpl compiles the GPL-licensed onion service proof-of-work
+    # module. Without it Tor silently accepts the maker's PoW request and
+    # provides no protection; see docs/setup.md (`tor --list-modules`).
+    config-opts:
+      - --enable-gpl
+    post-install:
+      - "/app/bin/tor --list-modules | grep -Fx 'pow: yes'"
     sources:
       - type: archive
         url: https://dist.torproject.org/tor-0.4.9.14.tar.gz
