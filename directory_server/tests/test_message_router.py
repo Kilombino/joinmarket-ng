@@ -316,14 +316,18 @@ class TestMessageRouterPrivateMessageFailedSend:
     @pytest.mark.anyio
     async def test_private_message_content_log_is_sensitive(self, registry, sample_peers):
         records: list[tuple[str, bool]] = []
-        handler = logger.add(
-            lambda message: records.append(
+        levels: list[str] = []
+
+        def capture(message) -> None:
+            records.append(
                 (
                     str(message.record["message"]),
                     bool(message.record["extra"].get("sensitive", False)),
                 )
             )
-        )
+            levels.append(message.record["level"].name)
+
+        handler = logger.add(capture, level="TRACE")
         from_peer = sample_peers[0]
         to_peer = sample_peers[1]
 
@@ -343,9 +347,66 @@ class TestMessageRouterPrivateMessageFailedSend:
         assert {
             sensitive for message, sensitive in records if "private-content-unique" in message
         } == {True}
-        assert {
-            sensitive for message, sensitive in records if message == "Routing private message"
-        } == {False}
+        # Per-message relay logging stays at DEBUG; operators get an INFO summary.
+        assert levels
+        assert set(levels) <= {"DEBUG", "TRACE"}
+
+    @pytest.mark.anyio
+    async def test_private_message_outcomes_are_counted(self, registry, sample_peers):
+        """Relay outcomes feed the periodic traffic summary and reset when taken."""
+        from_peer, to_peer = sample_peers[0], sample_peers[1]
+
+        async def send(peer_key: str, data: bytes, connection_id: str | None) -> None:
+            if b"fail-me" in data:
+                raise ConnectionError("gone")
+
+        router = MessageRouter(peer_registry=registry, send_callback=send)
+
+        def privmsg(to_nick: str, command: str = "cmd") -> MessageEnvelope:
+            payload = f"{from_peer.nick}!{to_nick}!{command} pubkey sig"
+            return MessageEnvelope(message_type=MessageType.PRIVMSG, payload=payload)
+
+        await router._handle_private_message(privmsg(to_peer.nick), from_peer.nick)
+        await router._handle_private_message(privmsg(to_peer.nick, "fail-me"), from_peer.nick)
+        await router._handle_private_message(privmsg("nobody"), from_peer.nick)
+        await router._handle_private_message(
+            MessageEnvelope(message_type=MessageType.PRIVMSG, payload="garbage"),
+            from_peer.nick,
+        )
+
+        counts = router.take_privmsg_counts()
+        assert (counts.relayed, counts.failed, counts.unknown_target, counts.invalid) == (
+            1,
+            1,
+            1,
+            1,
+        )
+        assert not router.take_privmsg_counts().any()
+
+    @pytest.mark.anyio
+    async def test_unknown_target_flood_logs_nothing_above_debug(self, registry, sample_peers):
+        """Messages to absent nicks must not produce per-message WARNING records."""
+        levels: list[str] = []
+        handler = logger.add(lambda m: levels.append(m.record["level"].name), level="TRACE")
+        from_peer = sample_peers[0]
+
+        async def send(peer_key: str, data: bytes, connection_id: str | None) -> None:
+            return None
+
+        router = MessageRouter(peer_registry=registry, send_callback=send)
+        try:
+            for i in range(200):
+                payload = f"{from_peer.nick}!absent{i}!cmd pubkey sig"
+                await router._handle_private_message(
+                    MessageEnvelope(message_type=MessageType.PRIVMSG, payload=payload),
+                    from_peer.nick,
+                )
+        finally:
+            logger.remove(handler)
+
+        assert levels
+        assert set(levels) <= {"DEBUG", "TRACE"}
+        assert router.take_privmsg_counts().unknown_target == 200
 
     @pytest.mark.anyio
     async def test_private_send_failure_reports_failed_generation(self, registry):

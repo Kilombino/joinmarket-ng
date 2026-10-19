@@ -43,6 +43,7 @@ from directory_server.peer_registry import (
 
 _DIRECTORY_SEND_TIMEOUT_SEC = 30.0
 _MAX_PENDING_HANDSHAKES = 128
+_TRAFFIC_SUMMARY_INTERVAL_SEC = 60.0
 
 
 def build_motd(user_motd: str) -> str:
@@ -133,6 +134,8 @@ class DirectoryServer:
         self._shutdown = False
         self._start_time = datetime.now(UTC)
         self._client_tasks: set[asyncio.Task[None]] = set()
+        self._traffic_summary_task: asyncio.Task[None] | None = None
+        self._summarized_rate_limit_violations = 0
         self.health_server = HealthCheckServer(
             host=settings.health_check_host, port=settings.health_check_port
         )
@@ -152,9 +155,35 @@ class DirectoryServer:
 
         self.health_server.start(self)
         self.heartbeat.start()
+        self._traffic_summary_task = asyncio.create_task(self._periodic_traffic_summary())
 
         async with self.server:
             await self.server.serve_forever()
+
+    async def _periodic_traffic_summary(self) -> None:
+        """Log one INFO line per window with relay outcomes, only when there was traffic.
+
+        Per-message relay logging is DEBUG, so this is the operator's view of
+        load under normal and flood conditions without a log volume that
+        scales with the message rate.
+        """
+        while not self._shutdown:
+            await asyncio.sleep(_TRAFFIC_SUMMARY_INTERVAL_SEC)
+            self.log_traffic_summary()
+
+    def log_traffic_summary(self) -> None:
+        counts = self.message_router.take_privmsg_counts()
+        total_violations = self.rate_limiter.get_stats()["total_violations"]
+        violations = max(0, total_violations - self._summarized_rate_limit_violations)
+        self._summarized_rate_limit_violations = total_violations
+        if not counts.any() and not violations:
+            return
+        logger.info(
+            f"Traffic (last {_TRAFFIC_SUMMARY_INTERVAL_SEC:.0f}s): "
+            f"privmsg relayed={counts.relayed} unknown_target={counts.unknown_target} "
+            f"invalid={counts.invalid} send_failed={counts.failed}; "
+            f"rate_limit_drops={violations}; peers={len(self.connections)}"
+        )
 
     async def _client_connected(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -170,6 +199,11 @@ class DirectoryServer:
         logger.info("Shutting down directory server...")
         self._shutdown = True
 
+        if self._traffic_summary_task is not None:
+            self._traffic_summary_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._traffic_summary_task
+            self._traffic_summary_task = None
         await self.heartbeat.stop()
         self.health_server.stop()
 

@@ -7,6 +7,7 @@ Implements Single Responsibility Principle: only handles message routing.
 import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable, Iterator
+from dataclasses import dataclass
 
 from jmcore.models import MessageEnvelope, NetworkType, PeerInfo, PeerStatus
 from jmcore.protocol import FeatureSet, MessageType, create_peerlist_entry, parse_jm_message
@@ -29,6 +30,19 @@ _PUBLIC_OUTGOING_BYTES_PER_SEC = 16 * 1024 * 1024
 _PUBLIC_OUTGOING_BURST_BYTES = 64 * 1024 * 1024
 _MAX_OFFERS_PER_OWNER = 256
 _MAX_OFFER_ID_LENGTH = 64
+
+
+@dataclass(slots=True)
+class PrivateMessageCounts:
+    """Outcomes of private message relays in one summary window."""
+
+    relayed: int = 0
+    unknown_target: int = 0
+    invalid: int = 0
+    failed: int = 0
+
+    def any(self) -> bool:
+        return bool(self.relayed or self.unknown_target or self.invalid or self.failed)
 
 
 class MessageRouter:
@@ -54,6 +68,16 @@ class MessageRouter:
             refill_rate=float(_PUBLIC_OUTGOING_BYTES_PER_SEC),
         )
         self._public_outgoing_drop_count = 0
+        # Private message outcomes since the last summary. Relays are logged at
+        # DEBUG per message and summarized at INFO so a flood cannot grow the
+        # log in proportion to its message rate.
+        self._privmsg_counts = PrivateMessageCounts()
+
+    def take_privmsg_counts(self) -> PrivateMessageCounts:
+        """Return the private message counters since the last call and reset them."""
+        counts = self._privmsg_counts
+        self._privmsg_counts = PrivateMessageCounts()
+        return counts
 
     async def route_message(
         self,
@@ -341,14 +365,15 @@ class MessageRouter:
             from_key, connection_id
         ):
             return
+        counts = self._privmsg_counts
         parsed = parse_jm_message(envelope.payload)
         if not parsed:
-            logger.warning("Invalid private message format")
+            counts.invalid += 1
+            logger.debug("Invalid private message format")
             return
 
         from_nick, to_nick, rest = parsed
-        logger.info("Routing private message")
-        logger.bind(sensitive=True).info(
+        logger.bind(sensitive=True).debug(
             f"PRIVMSG routing: {from_nick} -> {to_nick} (rest: {rest[:50]}...)"
         )
 
@@ -359,7 +384,7 @@ class MessageRouter:
         rest_parts = rest.split()
         if len(rest_parts) < 3:
             # Need at least: command, pubkey, sig
-            logger.bind(sensitive=True).warning(
+            logger.bind(sensitive=True).debug(
                 f"PRIVMSG from {from_nick} -> {to_nick} appears to lack a "
                 f"signature (only {len(rest_parts)} space-separated tokens). "
                 f"Relaying anyway but recipient will likely reject it. "
@@ -368,19 +393,20 @@ class MessageRouter:
 
         to_peer = self.peer_registry.get_by_nick(to_nick)
         if not to_peer or to_peer.status != PeerStatus.HANDSHAKED:
-            logger.warning("Private message target peer not found")
-            logger.bind(sensitive=True).warning(f"Target peer not found: {to_nick}")
-            logger.bind(sensitive=True).info(
-                f"Registered peer nicks: {list(self.peer_registry._peers)}"
-            )
+            # Routine when a peer left or rotated its nick; a flood of
+            # unknown targets shows up in the periodic summary instead.
+            counts.unknown_target += 1
+            logger.bind(sensitive=True).debug(f"Target peer not found: {to_nick}")
             return
 
         from_peer = self.peer_registry.get_by_key(from_key)
         if not from_peer or from_peer.network != to_peer.network:
-            logger.warning("Network mismatch or unknown sender")
+            counts.invalid += 1
+            logger.debug("Network mismatch or unknown sender")
             return
         if from_nick != from_peer.nick:
-            logger.bind(sensitive=True).warning(
+            counts.invalid += 1
+            logger.bind(sensitive=True).debug(
                 f"Dropping private message claiming {from_nick} from connection {from_peer.nick}"
             )
             return
@@ -390,19 +416,17 @@ class MessageRouter:
         if to_connection_id is None:
             return
         try:
-            logger.bind(sensitive=True).info(f"Sending to peer_key: {to_peer_key}")
             await self._call_send(to_peer_key, envelope.to_bytes(), to_connection_id)
-            logger.info("Private message routed")
-            logger.bind(sensitive=True).info(
+            counts.relayed += 1
+            logger.bind(sensitive=True).debug(
                 f"Successfully routed private message: {from_nick} -> {to_nick}"
             )
 
             await self._send_peer_location(to_peer_key, from_peer, to_connection_id)
         except Exception as e:
-            logger.warning("Failed to route private message")
-            logger.bind(sensitive=True).warning(
-                f"Failed to route private message to {to_nick}: {e}"
-            )
+            counts.failed += 1
+            logger.debug("Failed to route private message")
+            logger.bind(sensitive=True).debug(f"Failed to route private message to {to_nick}: {e}")
             # Notify server to clean up this peer's mapping
             if self.on_send_failed:
                 with contextlib.suppress(Exception):
