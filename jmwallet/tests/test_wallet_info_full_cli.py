@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import tempfile
 import time
+from dataclasses import replace
 from pathlib import Path
+from types import MethodType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -20,6 +22,7 @@ from jmwallet.cli import app
 from jmwallet.cli import wallet as wallet_cli
 from jmwallet.cli.info_render import BRANCH_NAME_WIDTH
 from jmwallet.wallet.models import AddressInfo
+from jmwallet.wallet.service import WalletService
 
 runner = CliRunner()
 
@@ -27,6 +30,7 @@ _EXT_ADDR = "bc1qfullviewexternal0000000000000000000000"
 _INT_ADDR = "bc1qfullviewinternal0000000000000000000000"
 _BOND_ACTIVE_ADDR = "bc1pfullviewbondactive000000000000000000000"
 _BOND_EXPIRED_ADDR = "bc1pfullviewbondexpired00000000000000000000"
+_CHAIN_TIME = 1_800_000_000
 
 
 def _make_utxo(
@@ -54,7 +58,17 @@ def _make_utxo(
 
 
 @pytest.fixture
-def full_view_wallet():
+def info_chain_time(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    snapshot = AsyncMock(return_value=_CHAIN_TIME)
+    monkeypatch.setattr(
+        "jmwallet.backends.descriptor_wallet.DescriptorWalletBackend.get_median_time_past",
+        snapshot,
+    )
+    return snapshot
+
+
+@pytest.fixture
+def full_view_wallet(info_chain_time):
     """Wallet mock with a deposit address (two UTXOs) and a reg-change UTXO."""
     utxo1 = _make_utxo("a" * 64, 0, 100_000, _EXT_ADDR, 3, "m/84'/0'/0'/0/0")
     utxo2 = _make_utxo("b" * 64, 1, 150_000, _EXT_ADDR, 5, "m/84'/0'/0'/0/0")
@@ -256,6 +270,119 @@ def full_view_wallet_with_bonds(full_view_wallet):
         ]
     )
     return full_view_wallet
+
+
+@pytest.fixture
+def chain_time_wallet(full_view_wallet: MagicMock, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Consistent cache and balance helpers, with host time ahead of chain time."""
+    monkeypatch.setattr(time, "time", lambda: _CHAIN_TIME + 3_600)
+    regular = full_view_wallet.utxo_cache[0]
+    regular[0].frozen = True
+    template = _make_utxo(
+        "d" * 64,
+        0,
+        40_000,
+        _BOND_EXPIRED_ADDR,
+        3,
+        "m/84'/0'/0'/2/0",
+        locktime=_CHAIN_TIME - 1,
+    )
+    bonds = [
+        template,
+        replace(template, txid="e" * 64, value=10_000, frozen=True),
+        replace(template, txid="f" * 64, value=60_000, locktime=_CHAIN_TIME),
+        replace(template, txid="1" * 64, value=20_000, locktime=_CHAIN_TIME + 1, frozen=True),
+    ]
+    bonds = [
+        replace(bond, address=f"bc1pchainviewbond{i}", path=f"m/84'/0'/0'/2/{i}")
+        for i, bond in enumerate(bonds)
+    ]
+    full_view_wallet.utxo_cache = {md: [] for md in range(full_view_wallet.mixdepth_count)}
+    full_view_wallet.utxo_cache[0] = regular + bonds
+    full_view_wallet.get_fidelity_bond_addresses_info.return_value = [
+        AddressInfo(
+            address=bond.address,
+            index=i,
+            balance=bond.value,
+            status="bond",
+            path=bond.path,
+            is_external=False,
+            is_bond=True,
+            locktime=bond.locktime,
+            utxos=[bond],
+        )
+        for i, bond in enumerate(bonds)
+    ]
+    for name in ("get_balance", "get_total_balance", "get_fidelity_bond_balance"):
+        setattr(full_view_wallet, name, MethodType(getattr(WalletService, name), full_view_wallet))
+    return full_view_wallet
+
+
+@pytest.mark.parametrize(
+    "args",
+    [("--show-utxos",), ("--extended", "--view", "legacy"), ("--extended", "--view", "full")],
+)
+@pytest.mark.parametrize("hidden", [False, True])
+def test_info_uses_one_chain_time_for_bonds(
+    chain_time_wallet: MagicMock,
+    info_chain_time: AsyncMock,
+    tmp_path: Path,
+    args: tuple[str, ...],
+    hidden: bool,
+) -> None:
+    if hidden:
+        (tmp_path / "config.toml").write_text("[wallet]\ninfo_show_fidelity_bonds = false\n")
+    chain_time_wallet.data_dir = tmp_path
+    result = _invoke_info(chain_time_wallet, str(tmp_path), *args)
+    assert result.exit_code == 0, result.output
+    info_chain_time.assert_awaited_once()
+    out = result.output
+    for amount, label in (
+        (422_000, "Total Wallet Balance"),
+        (100_000, "Frozen UTXOs"),
+        (80_000, "fidelity bonds time-locked"),
+        (10_000, "fidelity bonds expired (frozen)"),
+        (232_000, "Total Spendable Balance"),
+        (192_000, "thereof auto-selectable"),
+        (40_000, "thereof expired fidelity bonds (explicit selection or bond-only sweep)"),
+    ):
+        assert f"{amount:,} sats  {label}" in out
+    if args == ("--show-utxos",):
+        lines = out.splitlines()
+        expired = next(line for line in lines if f"{'d' * 64}:0" in line)
+        at_cutoff = next(line for line in lines if f"{'f' * 64}:0" in line)
+        assert "redeemable" in expired
+        assert "locked" in at_cutoff
+    elif hidden:
+        assert "hidden (2 active, 2 expired, 130,000 sats)" in out
+    elif args[-1] == "full":
+        assert "80,000 time-locked + 50,000 expired; spendable (explicit): 40,000 sats" in out
+        at_cutoff = next(line for line in out.splitlines() if f"{'f' * 64}:0" in line)
+        assert at_cutoff.split("|")[4].strip() == "fb-a"
+        assert at_cutoff.split("|")[5].strip() == "lock"
+    else:
+        assert "80,000 time-locked + 50,000 expired" in out
+        assert "[FB TIME-LOCKED]" in out
+
+
+def test_info_skips_chain_time_without_funded_bonds(
+    full_view_wallet: MagicMock, info_chain_time: AsyncMock, tmp_path: Path
+) -> None:
+    result = _invoke_info(full_view_wallet, str(tmp_path), "--extended", "--view", "full")
+    assert result.exit_code == 0, result.output
+    info_chain_time.assert_not_awaited()
+
+
+def test_info_chain_time_failure_does_not_fall_back_to_host_time(
+    chain_time_wallet: MagicMock, info_chain_time: AsyncMock, tmp_path: Path
+) -> None:
+    error = RuntimeError("chain time unavailable")
+    info_chain_time.side_effect = error
+    result = _invoke_info(chain_time_wallet, str(tmp_path), "--extended", "--view", "full")
+    assert result.exit_code == 1
+    assert result.exception is error
+    assert "Total Spendable Balance" not in result.output
+    chain_time_wallet.close.assert_awaited_once()
 
 
 class TestFullViewFidelityBonds:

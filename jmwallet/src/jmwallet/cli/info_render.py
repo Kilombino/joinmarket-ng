@@ -91,10 +91,9 @@ def _fb_state_text(row: UtxoRow | AddressRow) -> str:
 
     Time-locked bonds show ``lock``; expired ones show ``spend`` — the
     same token as regular branches, since expired bonds are spendable
-    (via explicit selection only, never auto-selected, and never as a
-    CoinJoin input). Empty bond addresses show no state (nothing to lock
-    or spend). A 0-conf bond shows ``0`` under ``confs`` instead of an
-    ``unconf`` state.
+    (via explicit selection or a bond-only sweep, never as a CoinJoin
+    input). Empty bond addresses show no state (nothing to lock or spend).
+    A 0-conf bond shows ``0`` under ``confs`` instead of an ``unconf`` state.
     """
     if isinstance(row, UtxoRow):
         state = "pend" if row.pending else "lock" if row.label == "fb-a" else "spend"
@@ -272,7 +271,7 @@ def render_hidden_note(hidden_count: int) -> str:
 def render_branch_summary(summary: BranchSummaryRow) -> str:
     """Per-branch balance line, fed from the summary row.
 
-    Fidelity bond funds are never auto-selected; their breakdown
+    Fidelity bond funds are excluded from normal automatic selection; their breakdown
     distinguishes time-locked from expired funds (chain facts). The final
     figure is the honestly spendable part: expired bonds minus frozen
     ones — a frozen expired bond is excluded from any transaction until
@@ -323,8 +322,9 @@ def render_legend(*, show_fidelity_bonds: bool = True) -> list[str]:
     if show_fidelity_bonds:
         lines += [
             "    fb-a   - fidelity bond active: time-locked until the fb-date",
-            "    fb-x   - fidelity bond expired: past its locktime; spendable only via "
-            "explicit selection (never auto-selected), cannot be used as a CoinJoin input",
+            "    fb-x   - fidelity bond expired: past its chain locktime; spendable via "
+            "explicit selection or bond-only sweep (when no regular inputs qualify), "
+            "never as a CoinJoin input",
         ]
     # The fb-x exception only makes sense when the bond vocabulary is on
     # the page; hidden bonds get the plain spend line (no dangling fb-x).

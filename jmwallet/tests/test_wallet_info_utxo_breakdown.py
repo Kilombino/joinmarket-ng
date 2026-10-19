@@ -37,8 +37,12 @@ def _make_utxo(txid: str, vout: int, value: int, address: str, md: int, **kw) ->
 
 
 @pytest.fixture
-def categorized_wallet():
+def categorized_wallet(monkeypatch):
     """Mock wallet with UTXOs spanning every category plus a fidelity bond."""
+    monkeypatch.setattr(
+        "jmwallet.backends.descriptor_wallet.DescriptorWalletBackend.get_median_time_past",
+        AsyncMock(return_value=1_800_000_000),
+    )
     cj_out = _make_utxo("11" * 32, 0, 27_350, "bc1qcjout0t0est00000000000000000000000000000", 1)
     deposit = _make_utxo(
         "33" * 32, 0, 9_812, "bc1qdep0s1t00000000000000000000000000000000", 0, frozen=True

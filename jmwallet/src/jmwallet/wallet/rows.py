@@ -157,10 +157,10 @@ class BranchSummaryRow:
     def spendable(self) -> int:
         """Balance usable for automatic coin selection.
 
-        Fidelity bond funds are never auto-selected (locked ones cannot
-        move; expired ones are spendable only via explicit selection, see
-        :attr:`expired_spendable`), so the branch contributes 0 — this
-        also matches the legacy "(spendable: 0 sats)" display.
+        Fidelity bond funds are excluded from normal automatic selection
+        (locked ones cannot move; expired ones need explicit selection or
+        a bond-only sweep, see :attr:`expired_spendable`), so the branch
+        contributes 0, matching the legacy "(spendable: 0 sats)" display.
         """
         if self.branch == FIDELITY_BOND_BRANCH:
             return 0
@@ -219,15 +219,18 @@ def derive_label(addr: AddressInfo, *, now: int | None = None) -> tuple[RowLabel
     - ``status == "reused"`` → ``(base_status, True)``. ``base_status`` is
       always set in that case (issue #564); defensively falls back to
       ``dep``/``chg`` by branch if it is missing or unusable.
-    - bond addresses → ``fb-a`` while the locktime is in the future,
-      ``fb-x`` otherwise (the lock state lives in the label; the
+    - bond addresses → ``fb-a`` until ``now`` strictly passes the locktime,
+      ``fb-x`` once strictly past it (the lock state lives in the label; the
       locktime date is a separate row field).
     - every other status maps onto its label via ``_STATUS_TO_LABEL``.
+
+    The CLI supplies chain median-time-past as ``now``; standalone display
+    callers default to host time.
     """
     if addr.is_bond or addr.status == "bond":
         if now is None:
             now = int(time.time())
-        locked = addr.locktime is not None and addr.locktime > now
+        locked = addr.locktime is not None and addr.locktime >= now
         return ("fb-a" if locked else "fb-x"), False
     if addr.status == "reused":
         base = addr.base_status
@@ -406,7 +409,7 @@ def summarize_branch(
         if row.utxo.frozen:
             frozen += row.utxo.value
         if branch == FIDELITY_BOND_BRANCH and row.locktime is not None:
-            if row.locktime > now:
+            if row.locktime >= now:
                 locked += row.utxo.value
             else:
                 expired += row.utxo.value

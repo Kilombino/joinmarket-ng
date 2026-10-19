@@ -2206,7 +2206,7 @@ def test_balance_footer_expired_bonds_count_as_spendable():
     assert lines[4].endswith("182,225 sats  Total Spendable Balance")
     assert lines[5].endswith("162,623 sats  thereof auto-selectable")
     assert lines[6].endswith(
-        "19,602 sats  thereof expired fidelity bonds (explicit selection only)"
+        "19,602 sats  thereof expired fidelity bonds (explicit selection or bond-only sweep)"
     )
     # markers: deduction vs. total vs. unmarked thereof rows
     assert lines[3].startswith("- ")
@@ -2234,7 +2234,7 @@ def test_balance_footer_frozen_expired_bonds_deducted():
     assert lines[5].endswith("180,225 sats  Total Spendable Balance")
     assert lines[6].endswith("162,623 sats  thereof auto-selectable")
     assert lines[7].endswith(
-        "17,602 sats  thereof expired fidelity bonds (explicit selection only)"
+        "17,602 sats  thereof expired fidelity bonds (explicit selection or bond-only sweep)"
     )
 
 

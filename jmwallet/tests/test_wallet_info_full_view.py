@@ -564,6 +564,12 @@ class TestLegend:
         assert "RU!" in text
         assert "\033[" not in text
 
+    def test_legend_documents_bond_only_sweep(self) -> None:
+        text = "\n".join(info_render.render_legend())
+        assert "explicit selection or bond-only sweep (when no regular inputs qualify)" in text
+        assert "never as a CoinJoin input" in text
+        assert "never auto-selected" not in text
+
     def test_legend_hides_bond_vocabulary_when_hidden(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

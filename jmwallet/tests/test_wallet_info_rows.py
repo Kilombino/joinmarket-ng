@@ -117,6 +117,24 @@ class TestDeriveLabel:
         addr = _addr(status="bond", is_bond=True, locktime=None, is_external=False)
         assert derive_label(addr, now=NOW) == ("fb-x", False)
 
+    def test_bond_expiry_requires_strictly_passing_chain_time(self) -> None:
+        for offset, expected_label in ((-1, "fb-x"), (0, "fb-a"), (1, "fb-a")):
+            locktime = NOW + offset
+            addr = _addr(
+                status="bond",
+                is_bond=True,
+                is_external=False,
+                balance=10_000,
+                locktime=locktime,
+                utxos=[_utxo(value=10_000, locktime=locktime)],
+            )
+            rows = build_branch_rows([addr], mixdepth=0, branch=2, now=NOW)
+            assert isinstance(rows[0], UtxoRow)
+            assert rows[0].label == expected_label
+            summary = summarize_branch(rows, mixdepth=0, branch=2, now=NOW)
+            assert summary.expired_spendable == (10_000 if offset < 0 else 0)
+            assert summary.locked_balance == (0 if offset < 0 else 10_000)
+
     def test_plain_statuses_map_to_short_labels(self) -> None:
         """The long AddressStatus names map onto short (max 4 chars) row labels."""
         expected: dict[AddressStatus, str] = {

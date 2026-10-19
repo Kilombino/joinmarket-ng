@@ -945,8 +945,8 @@ def _balance_footer_lines(
     transaction (frozen UTXOs, time-locked fidelity bonds, expired bonds that
     are additionally frozen) and reports the spendable total. That total
     counts expired, non-frozen fidelity bonds as spendable because they are
-    usable via explicit selection; the ``thereof`` lines split the total into
-    the auto-selectable part and the part that needs explicit selection
+    usable via explicit selection or a bond-only sweep; the ``thereof`` lines
+    split the total into the regular part and the part that needs bond selection
     whenever the latter is non-zero.
 
     Returns the footer lines including the leading blank line; the caller
@@ -971,7 +971,11 @@ def _balance_footer_lines(
     if expired_spendable > 0:
         rows.append((" ", spendable_balance, "thereof auto-selectable"))
         rows.append(
-            (" ", expired_spendable, "thereof expired fidelity bonds (explicit selection only)")
+            (
+                " ",
+                expired_spendable,
+                "thereof expired fidelity bonds (explicit selection or bond-only sweep)",
+            )
         )
 
     # Right-align the amounts so the sats column lines up, sizing the column
@@ -1203,6 +1207,23 @@ async def _show_wallet_info(
             if u.frozen and not u.is_fidelity_bond
         )
 
+        # Use the same chain-time snapshot for every bond display and the
+        # footer. Spending requires locktime < MTP, not merely host expiry.
+        # A failed lookup must not fall back to host time and overstate funds.
+        bond_now = None
+        bond_locked_total = 0
+        expired_frozen = 0
+        if fb_balance > 0:
+            bond_now = await backend.get_median_time_past()
+            for utxos in wallet.utxo_cache.values():
+                for u in utxos:
+                    if not u.is_fidelity_bond:
+                        continue
+                    if u.locktime is not None and u.locktime >= bond_now:
+                        bond_locked_total += u.value
+                    elif u.frozen:
+                        expired_frozen += u.value
+
         # Calculate formatting width for branch balances
         balance_width = len(f"{spendable_balance + total_frozen:,}")
 
@@ -1238,6 +1259,7 @@ async def _show_wallet_info(
                     display_gap,
                     show_empty=show_empty,
                     show_fidelity_bonds=show_fidelity_bonds,
+                    now=bond_now,
                 )
             else:
                 _show_extended_wallet_info(
@@ -1248,12 +1270,13 @@ async def _show_wallet_info(
                     show_empty=show_empty,
                     balance_width=balance_width,
                     show_fidelity_bonds=show_fidelity_bonds,
+                    now=bond_now,
                 )
         else:
             # Balance checks must not allocate receive addresses.
             # Simple view - show UTXO breakdown, then balance per mixdepth
             if show_utxos:
-                _print_categorized_utxos(wallet)
+                _print_categorized_utxos(wallet, now=bond_now)
 
             print(f"\n{colorize('Spendable Balance by Mixdepth:', ANSI_BOLD_YELLOW)}")
             md_balances = [
@@ -1286,25 +1309,6 @@ async def _show_wallet_info(
                         md_suffix_parts.append(f"{fb_balance:,} Fidelity Bonds")
                 suffix = f" ({', '.join(md_suffix_parts)})" if md_suffix_parts else ""
                 print(f"  Mixdepth {md}: {balance:>{md_balance_width},} sats{suffix}")
-
-        # Wallet-wide balance footer. Split the fidelity bonds into the parts
-        # the footer treats differently: time-locked bonds cannot be spent at
-        # all; expired bonds are spendable via explicit selection unless they
-        # are additionally frozen.
-        bond_locked_total = 0
-        expired_frozen = 0
-        if fb_balance > 0:
-            import time
-
-            current_time = int(time.time())
-            for utxos in wallet.utxo_cache.values():
-                for u in utxos:
-                    if not u.is_fidelity_bond:
-                        continue
-                    if u.locktime and u.locktime > current_time:
-                        bond_locked_total += u.value
-                    elif u.frozen:
-                        expired_frozen += u.value
 
         for line in _balance_footer_lines(
             spendable_balance,
@@ -1387,7 +1391,7 @@ def _elide_address(addr: str, width: int) -> str:
     return f"{addr[:first]}...{addr[-last:]}"
 
 
-def _print_categorized_utxos(wallet: WalletService) -> None:
+def _print_categorized_utxos(wallet: WalletService, *, now: int | None = None) -> None:
     """Print the basic ``jm-wallet info`` UTXO breakdown grouped by type.
 
     Every funded UTXO is bucketed by its CoinJoin provenance classification
@@ -1408,6 +1412,9 @@ def _print_categorized_utxos(wallet: WalletService) -> None:
     than one ``none`` per mixdepth.
     """
     from jmwallet.wallet.models import UTXOInfo
+
+    if now is None:
+        now = int(time.time())
 
     # Bucket UTXOs by classification, keeping (mixdepth, utxo) pairs.
     by_category: dict[str, list[tuple[int, UTXOInfo]]] = {
@@ -1483,7 +1490,7 @@ def _print_categorized_utxos(wallet: WalletService) -> None:
             confs_display = "5+ conf" if utxo.confirmations >= 5 else f"{utxo.confirmations} conf"
             if utxo.frozen:
                 state = "frozen"
-            elif utxo.is_fidelity_bond and utxo.is_locked:
+            elif utxo.is_fidelity_bond and utxo.locktime is not None and utxo.locktime >= now:
                 state = "locked"
             elif utxo.is_fidelity_bond:
                 # Expired bond: still redeemable via the bond redeem flow, not
@@ -1581,7 +1588,9 @@ def _print_branch_addresses(
     return total_balance, hidden
 
 
-def _fidelity_bond_hidden_notice(bond_addresses: list[AddressInfo], coin_type: int) -> str | None:
+def _fidelity_bond_hidden_notice(
+    bond_addresses: list[AddressInfo], coin_type: int, *, now: int | None = None
+) -> str | None:
     """One-line notice standing in for the hidden fidelity bond table.
 
     Shown when ``wallet.info_show_fidelity_bonds`` is false so the user
@@ -1595,12 +1604,13 @@ def _fidelity_bond_hidden_notice(bond_addresses: list[AddressInfo], coin_type: i
     """
     from jmwallet.wallet.constants import FIDELITY_BOND_BRANCH
 
-    now = int(time.time())
+    if now is None:
+        now = int(time.time())
     active = sum(
-        1 for a in bond_addresses if a.balance > 0 and a.locktime is not None and a.locktime > now
+        1 for a in bond_addresses if a.balance > 0 and a.locktime is not None and a.locktime >= now
     )
     expired = sum(
-        1 for a in bond_addresses if a.balance > 0 and (a.locktime is None or a.locktime <= now)
+        1 for a in bond_addresses if a.balance > 0 and (a.locktime is None or a.locktime < now)
     )
     if active + expired == 0:
         return None
@@ -1629,6 +1639,8 @@ def _show_extended_wallet_info(
     show_empty: bool = False,
     balance_width: int = 10,
     show_fidelity_bonds: bool = True,
+    *,
+    now: int | None = None,
 ) -> None:
     """
     Display extended wallet information with detailed address listings.
@@ -1653,6 +1665,9 @@ def _show_extended_wallet_info(
 
     from jmwallet.history import get_pending_transactions
     from jmwallet.wallet.service import FIDELITY_BOND_BRANCH
+
+    if now is None:
+        now = int(time.time())
 
     # Print legend for address statuses
     print(f"\n{colorize('Address status legend:', ANSI_BOLD_WHITE)}")
@@ -1767,11 +1782,9 @@ def _show_extended_wallet_info(
 
                 bond_balance = 0
                 bond_locked = 0  # Locked balance (not yet expired)
-                current_time = int(time.time())
-
                 for addr_info in bond_addresses:
                     bond_balance += addr_info.balance
-                    is_locked = addr_info.locktime and addr_info.locktime > current_time
+                    is_locked = addr_info.locktime is not None and addr_info.locktime >= now
                     if is_locked:
                         bond_locked += addr_info.balance
 
@@ -1818,7 +1831,7 @@ def _show_extended_wallet_info(
         # can be reconciled via the notice's sats sum).
         if md == 0 and not show_fidelity_bonds:
             notice = _fidelity_bond_hidden_notice(
-                bond_addresses, 0 if wallet.network == "mainnet" else 1
+                bond_addresses, 0 if wallet.network == "mainnet" else 1, now=now
             )
             if notice is not None:
                 print()
@@ -1846,6 +1859,8 @@ def _show_full_wallet_info(
     gap_limit: int,
     show_empty: bool = False,
     show_fidelity_bonds: bool = True,
+    *,
+    now: int | None = None,
 ) -> None:
     """Render the ``full`` extended view via the canonical row model.
 
@@ -1886,6 +1901,9 @@ def _show_full_wallet_info(
         summarize_branch,
         summarize_mixdepth,
     )
+
+    if now is None:
+        now = int(time.time())
 
     for line in render_legend(show_fidelity_bonds=show_fidelity_bonds):
         print(line)
@@ -1928,10 +1946,11 @@ def _show_full_wallet_info(
                     branch=FIDELITY_BOND_BRANCH,
                     pending_addresses=pending_addresses,
                     show_empty=show_empty,
+                    now=now,
                 )
                 branches.append((FIDELITY_BOND_BRANCH, "fidelity bond addr.", bond_path, bond_rows))
             elif not show_fidelity_bonds:
-                notice = _fidelity_bond_hidden_notice(bond_addresses, coin_type)
+                notice = _fidelity_bond_hidden_notice(bond_addresses, coin_type, now=now)
                 if notice is not None:
                     hidden_fb_notices[md] = notice
 
@@ -2068,7 +2087,7 @@ def _show_full_wallet_info(
                 sep_width=page_width,
             ):
                 print(line)
-            summary = summarize_branch(rows, mixdepth=md, branch=branch)
+            summary = summarize_branch(rows, mixdepth=md, branch=branch, now=now)
             branch_summaries.append(summary)
             print(render_branch_summary(summary))
 
