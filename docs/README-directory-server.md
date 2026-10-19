@@ -58,6 +58,9 @@ Internet <--> [tor container] <-- internal network --> [directory_server contain
   direct internet access, no information leakage.
 - `tor` bridges `joinmarket_directory_internal` and `joinmarket_directory_external`,
   exposing the directory server only as a Tor hidden service.
+- `tor/conf/torrc` enables Tor's introduction-point rate limiting for the onion service and
+  documents how to turn on proof-of-work once the Tor build includes the `pow` module. See
+  [Security](technical/security.md) for how floods are handled and logged.
 
 ##### Debug Image
 

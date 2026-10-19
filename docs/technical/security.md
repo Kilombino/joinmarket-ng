@@ -129,6 +129,40 @@ peerlist. Maker deadlines do not impose a 60-second limit on verified CoinJoin
 work. These bounds reduce resource exhaustion; they do not prevent Sybil attacks
 or guarantee admission while an adversary continuously occupies available slots.
 
+### Flood Behavior and Log Volume
+
+Under a message flood the limits above hold CPU and memory flat; the first
+resource to go is usually log retention, because an attacker controls how many
+lines are written per second. The components therefore keep per-message
+handling quiet and report in aggregate:
+
+- A maker closes a direct socket after a handful of lines without a handshake,
+  or after a bounded run of lines rejected by its per-socket token bucket.
+  Both counts are per socket, so a conforming client that reconnects starts
+  clean. Flood logging is rate limited per peer, not per line.
+- A directory logs relayed, unknown-target, invalid, and failed private
+  messages at DEBUG and prints one INFO summary line per minute when there was
+  traffic. Per-connection rate-limit drops appear in the same line.
+
+Retention is an operator setting. The repository Compose files rotate
+container logs by size with compression. systemd users should bound the
+journal (`SystemMaxUse=` in `journald.conf`) and may lower the per-service
+rate with `LogRateLimitIntervalSec=`/`LogRateLimitBurst=` in the unit; plain
+CLI users should not redirect stderr to an unbounded file, and should prefer
+the INFO level in production because DEBUG scales with peer traffic.
+
+### Tor Onion Service Defenses
+
+A maker requests Tor's proof-of-work defense for its ephemeral onion through
+ADD_ONION (Tor 0.4.9.2+). Tor accepts the request and returns success even on
+builds without the `pow` module, and offers no control-port query for it, so
+the maker reports the defense as requested rather than active. Check
+`tor --list-modules` on the Tor host: PoW only takes effect when it shows
+`pow: yes`, which requires a Tor built with `--enable-gpl`. The directory
+server's vendored `torrc` enables introduction-point rate limiting
+unconditionally and ships the PoW options commented out, because Tor refuses
+to start when they are set on a build without the module.
+
 ### Wallet Daemon Admission
 
 Create, recover, and unlock share a serialized lifecycle with at most eight
