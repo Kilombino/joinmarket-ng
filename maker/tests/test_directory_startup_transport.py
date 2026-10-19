@@ -15,6 +15,7 @@ from directory_server.server import DirectoryServer
 from jmcore.config import TorControlConfig
 from jmcore.crypto import NickIdentity, verify_signed_privmsg
 from jmcore.directory_client import DirectoryClient
+from jmcore.directory_pool import DEFAULT_SETTLE_GRACE_SEC
 from jmcore.models import NetworkType, Offer, OfferType
 from jmcore.network import ONION_HOSTID, TCPConnection
 from jmcore.nick_auth import NickAuthMode
@@ -89,7 +90,14 @@ async def _receive_signed_offer(requester: DirectoryClient, maker_nick: str) -> 
 async def test_maker_serves_orderbook_when_parallel_startup_cancels_stalled_handshake(
     stalled_first: bool, tmp_path: Path
 ) -> None:
-    """One healthy directory must make maker startup live without waiting for a stalled peer."""
+    """One healthy directory makes maker startup live after at most the settle grace.
+
+    After the first directory connects, startup waits ``DEFAULT_SETTLE_GRACE_SEC``
+    for in-flight handshakes so a directory whose circuit is already up is
+    adopted immediately instead of on the next periodic reconnect pass. A peer
+    whose handshake stalls is then cancelled; it must not hold startup for the
+    full ``directory_startup_timeout``.
+    """
     stalled_handshake_received = asyncio.Event()
     stalled_peer_eof = asyncio.Event()
     raw_handler_tasks: list[asyncio.Task[Any]] = []
@@ -117,7 +125,13 @@ async def test_maker_serves_orderbook_when_parallel_startup_cancels_stalled_hand
         try:
             await asyncio.wait_for(reader.readuntil(b"\n"), timeout=_WATCHDOG_TIMEOUT)
             stalled_handshake_received.set()
-            assert await asyncio.wait_for(reader.read(), timeout=_WATCHDOG_TIMEOUT) == b""
+            # The maker holds this socket for the settle grace before cancelling.
+            assert (
+                await asyncio.wait_for(
+                    reader.read(), timeout=DEFAULT_SETTLE_GRACE_SEC + _WATCHDOG_TIMEOUT
+                )
+                == b""
+            )
             stalled_peer_eof.set()
         finally:
             writer.close()
@@ -185,7 +199,13 @@ async def test_maker_serves_orderbook_when_parallel_startup_cancels_stalled_hand
             )
         ]
 
-        await asyncio.wait_for(bot._connect_to_directories_with_retry(), timeout=_WATCHDOG_TIMEOUT)
+        started = asyncio.get_running_loop().time()
+        await asyncio.wait_for(
+            bot._connect_to_directories_with_retry(),
+            timeout=DEFAULT_SETTLE_GRACE_SEC + _WATCHDOG_TIMEOUT,
+        )
+        startup_elapsed = asyncio.get_running_loop().time() - started
+        assert startup_elapsed < config.directory_startup_timeout
         await asyncio.wait_for(stalled_peer_eof.wait(), timeout=_WATCHDOG_TIMEOUT)
         assert set(bot.directory_clients) == {healthy_endpoint}
         await _wait_until(lambda: directory.peer_registry.count() == 1, "maker handshake")

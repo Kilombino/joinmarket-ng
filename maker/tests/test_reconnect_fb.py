@@ -125,3 +125,62 @@ async def test_reconnect_does_not_announce_bond_publicly(
             assert "!tbond" not in msg, (
                 f"Public reconnect message must not contain !tbond, got: {msg!r}"
             )
+
+
+@pytest.mark.asyncio
+async def test_periodic_reconnect_dials_directories_concurrently(mock_wallet, mock_backend):
+    """One unreachable directory must not delay reconnection to the others.
+
+    A dead onion costs the full Tor connect timeout, so sequential dialing
+    would hold healthy directories behind every dead one on each pass.
+    """
+    config = MakerConfig(
+        mnemonic="test " * 12,
+        directory_servers=["dead.onion:5222", "alive.onion:5222"],
+        network=NetworkType.REGTEST,
+    )
+    bot = MakerBot(wallet=mock_wallet, backend=mock_backend, config=config)
+    bot.running = True
+    bot.directory_clients = {}
+
+    dead_started = asyncio.Event()
+    release_dead = asyncio.Event()
+    alive_client = MagicMock()
+    alive_client.send_public_message = AsyncMock(return_value=None)
+
+    async def connect(dir_server: str):
+        if dir_server.startswith("dead"):
+            dead_started.set()
+            await release_dead.wait()
+            return None
+        # The healthy directory only answers once the dead one is already
+        # blocked, which proves the two dials overlap.
+        await dead_started.wait()
+        return ("alive.onion:5222", alive_client)
+
+    bot._connect_to_directory = AsyncMock(side_effect=connect)
+    sleeps = {"n": 0}
+
+    async def fake_sleep(_delay: float) -> None:
+        sleeps["n"] += 1
+        if sleeps["n"] > 2:
+            raise asyncio.CancelledError()
+
+    with (
+        patch("maker.background_tasks.get_notifier") as mock_notifier,
+        patch("maker.background_tasks.asyncio.sleep", side_effect=fake_sleep),
+    ):
+        mock_notifier.return_value = MagicMock()
+        mock_notifier.return_value.notify_directory_reconnect = AsyncMock()
+        mock_notifier.return_value.notify_all_directories_reconnected = AsyncMock()
+        task = asyncio.create_task(bot._periodic_directory_reconnect())
+        # The pass cannot finish until the dead dial is released.
+        await asyncio.wait_for(dead_started.wait(), timeout=2.0)
+        release_dead.set()
+        try:
+            await asyncio.wait_for(task, timeout=2.0)
+        except asyncio.CancelledError:
+            pass
+
+    assert "alive.onion:5222" in bot.directory_clients
+    assert bot._directory_reconnect_attempts.get("dead.onion:5222") == 1

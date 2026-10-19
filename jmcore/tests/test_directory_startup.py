@@ -165,6 +165,70 @@ async def test_connect_all_with_retry_retains_all_immediate_successes() -> None:
 
 
 @pytest.mark.asyncio
+async def test_connect_all_with_retry_adopts_slower_success_within_settle_grace() -> None:
+    """An attempt that completes shortly after the first success is kept, not cancelled."""
+    pool = _make_pool(["fast.onion:5222", "slower.onion:5222"])
+    fast_done = asyncio.Event()
+
+    fast_client = MagicMock(close=AsyncMock())
+
+    async def connect_fast() -> None:
+        fast_done.set()
+
+    fast_client.connect = AsyncMock(side_effect=connect_fast)
+
+    slower_client = MagicMock(close=AsyncMock())
+
+    async def connect_slower() -> None:
+        await fast_done.wait()
+        await asyncio.sleep(0.05)
+
+    slower_client.connect = AsyncMock(side_effect=connect_slower)
+
+    clients = {"fast.onion": fast_client, "slower.onion": slower_client}
+    with patch(
+        "jmcore.directory_pool.DirectoryClient",
+        side_effect=lambda **kwargs: clients[kwargs["host"]],
+    ):
+        connected = await asyncio.wait_for(
+            pool.connect_all_with_retry(timeout=5.0, initial_delay=0.01, settle_grace=1.0),
+            timeout=3.0,
+        )
+
+    assert connected == 2
+    assert set(pool.clients) == {"fast.onion:5222", "slower.onion:5222"}
+    slower_client.close.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_connect_all_with_retry_cancels_attempts_after_settle_grace() -> None:
+    """The grace is bounded: a hanging attempt is cancelled once it elapses."""
+    pool = _make_pool(["fast.onion:5222", "hanging.onion:5222"])
+    fast_client = MagicMock(connect=AsyncMock(), close=AsyncMock())
+    hanging_client = MagicMock(close=AsyncMock())
+    never = asyncio.Event()
+    hanging_client.connect = AsyncMock(side_effect=never.wait)
+
+    clients = {"fast.onion": fast_client, "hanging.onion": hanging_client}
+    loop = asyncio.get_running_loop()
+    with patch(
+        "jmcore.directory_pool.DirectoryClient",
+        side_effect=lambda **kwargs: clients[kwargs["host"]],
+    ):
+        started = loop.time()
+        connected = await asyncio.wait_for(
+            pool.connect_all_with_retry(timeout=5.0, initial_delay=0.01, settle_grace=0.1),
+            timeout=3.0,
+        )
+        elapsed = loop.time() - started
+
+    assert connected == 1
+    assert set(pool.clients) == {"fast.onion:5222"}
+    hanging_client.close.assert_awaited_once()
+    assert 0.1 <= elapsed < 2.0
+
+
+@pytest.mark.asyncio
 async def test_connect_all_with_retry_deduplicates_canonical_endpoint_aliases() -> None:
     pool = _make_pool(["same.onion", "same.onion:5222"])
     client = MagicMock(connect=AsyncMock(), close=AsyncMock())

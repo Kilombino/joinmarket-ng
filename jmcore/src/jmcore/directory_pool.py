@@ -56,6 +56,12 @@ class DirectoryConnectionResult:
         return self.total - self.connected
 
 
+# After the first directory connects, in-flight attempts get this long to
+# finish their handshake before being cancelled. It covers peers whose Tor
+# circuit is already up; a stalled or dead peer delays startup by at most this.
+DEFAULT_SETTLE_GRACE_SEC = 5.0
+
+
 class DirectoryClientPool:
     """
     Manages a pool of :class:`DirectoryClient` connections over Tor.
@@ -236,6 +242,7 @@ class DirectoryClientPool:
         initial_delay: float = 5.0,
         max_delay: float = 30.0,
         backoff: float = 1.5,
+        settle_grace: float = DEFAULT_SETTLE_GRACE_SEC,
     ) -> int:
         """
         Connect to configured servers concurrently with bounded retry.
@@ -244,10 +251,13 @@ class DirectoryClientPool:
         keeps retrying failed servers until either at least one client
         connects or ``timeout`` elapses, whichever comes first. After
         timeout the method returns gracefully so callers can rely on a
-        separate periodic reconnect task. Retain completed successes, cancel
-        unfinished attempts once a directory is available, and let periodic
-        reconnection fill in the remaining directories. A slow endpoint must
-        not prevent callers from listening on a ready connection.
+        separate periodic reconnect task. Retain completed successes, keep
+        waiting for the remaining attempts for at most ``settle_grace``
+        seconds after the first success (still bounded by ``timeout``), then
+        cancel what is left and let periodic reconnection fill in the
+        remaining directories. The grace covers attempts whose Tor circuit is
+        already up and are mid-handshake; a slow or dead endpoint must not
+        prevent callers from listening on a ready connection.
 
         Args:
             timeout: Hard deadline in seconds across all attempts.
@@ -255,6 +265,8 @@ class DirectoryClientPool:
                 connection has succeeded yet.
             max_delay: Cap on the exponentially-backed-off delay.
             backoff: Multiplier applied to ``initial_delay`` per pass.
+            settle_grace: Extra seconds to wait for in-flight attempts after
+                the first success.
 
         Returns:
             Number of clients currently in ``self.clients`` when the
@@ -276,11 +288,13 @@ class DirectoryClientPool:
             }
             pending = set(tasks)
             adopted: set[asyncio.Task[tuple[str, DirectoryClient] | None]] = set()
+            settle_deadline: float | None = None
             try:
                 while pending:
+                    wait_until = deadline if settle_deadline is None else settle_deadline
                     done, pending = await asyncio.wait(
                         pending,
-                        timeout=max(0.0, deadline - loop.time()),
+                        timeout=max(0.0, wait_until - loop.time()),
                         return_when=asyncio.FIRST_COMPLETED,
                     )
                     # Preserve configured ordering among simultaneous results.
@@ -302,7 +316,9 @@ class DirectoryClientPool:
                             raise
                         adopted.add(task)
                         logger.bind(sensitive=True).info(f"Connected to directory: {server}")
-                    if self.clients or loop.time() >= deadline:
+                    if self.clients and settle_deadline is None:
+                        settle_deadline = min(deadline, loop.time() + settle_grace)
+                    if loop.time() >= wait_until:
                         break
             finally:
                 for task in tasks:

@@ -8,6 +8,7 @@ directory reconnection, and pending transaction monitoring.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from typing import TYPE_CHECKING
 
@@ -347,20 +348,32 @@ class BackgroundTasksMixin:
                     f"disconnected director{'y' if len(disconnected_servers) == 1 else 'ies'}..."
                 )
 
+                # Check retry limits first so every eligible directory is
+                # dialed concurrently: a Tor connect can take the full SOCKS
+                # timeout when a directory is unreachable, and dialing
+                # sequentially would delay healthy directories by that much
+                # per dead one.
+                max_retries = self.config.directory_reconnect_max_retries
+                eligible: list[tuple[str, str]] = []
                 for dir_server, node_id in disconnected_servers:
-                    if generation.state is not GenerationState.ACCEPTING:
-                        break
-
-                    # Check retry limit
-                    max_retries = self.config.directory_reconnect_max_retries
                     attempts = reconnect_attempts.get(node_id, 0)
-
                     if max_retries > 0 and attempts >= max_retries:
                         logger.debug(f"Skipping {node_id}: max retries ({max_retries}) reached")
                         continue
+                    eligible.append((dir_server, node_id))
 
-                    # Attempt reconnection
-                    result = await self._connect_to_directory(dir_server)
+                results = await asyncio.gather(
+                    *(self._connect_to_directory(dir_server) for dir_server, _ in eligible),
+                    return_exceptions=True,
+                )
+
+                for (dir_server, node_id), outcome in zip(eligible, results, strict=True):
+                    if isinstance(outcome, BaseException):
+                        reconnect_attempts[node_id] = reconnect_attempts.get(node_id, 0) + 1
+                        logger.debug(f"Reconnection to {dir_server} raised: {outcome}")
+                        continue
+                    result = outcome
+                    attempts = reconnect_attempts.get(node_id, 0)
 
                     # Rotation may complete while a Tor connection is being
                     # established. Never install a client prepared for a stale
@@ -370,8 +383,10 @@ class BackgroundTasksMixin:
                         or self.current_generation_id != generation_id
                         or self._generation(generation_id) is not generation
                     ):
-                        if result is not None:
-                            await result[1].close()
+                        for stale in results:
+                            if isinstance(stale, tuple):
+                                with contextlib.suppress(Exception):
+                                    await stale[1].close()
                         break
 
                     if result:
