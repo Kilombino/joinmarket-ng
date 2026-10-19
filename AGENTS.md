@@ -50,7 +50,8 @@ Tests use pytest markers to organize by Docker profile:
 ## General Guidelines
 
 - Check the documentation at README.md and docs/.
-- Add tests and verify the new and existing tests pass, you can use the docker compose setup.
+- Add or update tests in proportion to the behavior and risk being changed. Use the Docker
+  Compose setup when integration coverage is needed, not automatically for every edit.
 - Improve the documentation as needed.
 - Don't break backwards compatibility even with the reference implementation. Use feature flags if needed.
 - Don't use real mainnet transactions or addresses in tests or examples for privacy reasons.
@@ -58,6 +59,22 @@ Tests use pytest markers to organize by Docker profile:
 - If you add or change settings, update config.toml.template
 - When adding a new field to `MakerSettings` / `TakerSettings` / etc., also wire it through the corresponding `build_*_config` in the component's `cli.py` into the runtime `MakerConfig` / `TakerConfig` (and any nested `OfferConfig`s), and add a settings -> config round-trip test. Defining a setting without wiring it makes the documented config key silently ignored.
 - Do not manually edit CHANGELOG.md during normal development.
+
+## Test Design and Maintenance
+
+- Test observable behavior, meaningful cross-file consistency, and consequential safety or
+  compatibility policies. Do not add tests merely to increase the test count or check off a task.
+- Avoid assertions that just repeat dependency versions, commit hashes, command text, or
+  implementation structure. Those assertions create maintenance churn without demonstrating
+  correctness. Fixed protocol constants, security boundaries, and deliberate compatibility
+  fixtures can justify exact expectations.
+- Existing tests are evidence about the intended contract, not immutable specifications. When
+  an authorized change intentionally supersedes an expectation, update or replace that test
+  after understanding what it protects. Explain consequential behavior changes; do not
+  mechanically rewrite expected values, relax security checks, or discard failures to get green.
+- Prefer a few focused regression checks that can catch a plausible failure. Add unit and
+  integration coverage where each provides distinct evidence, rather than duplicating the same
+  assertion at multiple levels. Documentation-only edits do not need dedicated tests.
 
 ## Commit and Changelog Policy
 
