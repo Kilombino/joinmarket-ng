@@ -114,6 +114,20 @@ session:
 sudo usermod -aG debian-tor "$USER"
 ```
 
+Makers ask Tor to protect their onion service with proof of work, which makes
+flooding it cost the attacker CPU. Tor only honors this on builds that include
+the `pow` module, and it accepts the request without complaint on builds that
+do not, so the maker cannot detect the difference. Verify it once on the Tor
+host:
+
+```bash
+tor --list-modules
+```
+
+If `pow: no` is printed, the defense is not in effect: the maker logs it as
+requested, but Tor ignores it. A Tor built from source needs `--enable-gpl`;
+for a packaged or containerized Tor, check how the package was built.
+
 ## Next
 
 [Create or import a wallet](getting-started.md). For connection or sync
