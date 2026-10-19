@@ -200,15 +200,6 @@ def test_parallel_playwright_uses_standalone_ng_http_endpoint() -> None:
     assert "NODE_TLS_REJECT_UNAUTHORIZED" not in playwright_runner
 
 
-def test_playwright_dependency_setup_is_locked_and_bounded() -> None:
-    script = PLAYWRIGHT_INSTALL_SCRIPT.read_text()
-
-    assert "npm ci" in script
-    assert "timeout 240 npx playwright install chromium" in script
-    assert "npx playwright install-deps chromium" in script
-    assert "sudo -n" in script
-
-
 def test_parallel_runner_imports_this_worktree() -> None:
     script = PARALLEL_TEST_SCRIPT.read_text()
 

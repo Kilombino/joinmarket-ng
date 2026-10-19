@@ -12,7 +12,8 @@ for command_name in node npm npx timeout; do
 done
 
 cd "$PLAYWRIGHT_DIR"
-npm ci
+# Refresh populated local installs too, ignoring any old lockfile.
+npm update --no-save --package-lock=false --include=dev
 
 for attempt in 1 2 3; do
     printf 'Playwright browser install attempt %s...\n' "$attempt"

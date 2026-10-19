@@ -1,10 +1,10 @@
 # The final jam-standalone images still contain joinmarket-clientserver v0.9.11.
 # Build the signed final clientserver release separately, then layer it onto the
 # pinned Jam runtime so reference tests exercise maintained maker behavior.
-ARG JAM_STANDALONE_IMAGE=ghcr.io/joinmarket-webui/jam-standalone:v0.4.0-clientserver-v0.9.11@sha256:3742e15734b91ea520ae7b78c2e6b82aed715bdcda5a786c92efe77ffd89ecc7
+ARG JAM_STANDALONE_IMAGE=ghcr.io/joinmarket-webui/jam-standalone:latest
 ARG JM_SERVER_TAG=v0.9.12
 ARG JM_SERVER_COMMIT=77a426c504cbf6fa56ba0316dfd8da63a76d2bbf
-FROM alpine:3.21.2@sha256:56fa17d2a7e7f168a043a2712e63aed1f8543aeafdcee47c58dcffe38ed51099 AS server-builder
+FROM alpine:latest AS server-builder
 
 ARG JM_SERVER_TAG
 ARG JM_SERVER_COMMIT

@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 USER_AGENT = "joinmarket-ng-dependency-updater/1.0"
 JAM_REPO_URL = "https://github.com/joinmarket-webui/jam.git"
 JAM_DOCKER_REPO_URL = "https://github.com/joinmarket-webui/jam-docker.git"
+SECP256K1_REPO = "bitcoin-core/secp256k1"
 SEMVER_NUMBER = r"(?:0|[1-9]\d*)"
 SEMVER_PRERELEASE_IDENTIFIER = (
     rf"(?:{SEMVER_NUMBER}|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
@@ -41,6 +42,9 @@ NEUTRINO_ARM64_RE = re.compile(
     r"neutrinod-linux-arm64)(\s*\n\s*sha256:\s*)([a-f0-9]+)"
 )
 JAM_COMMIT_RE = re.compile(r"(?ms)(- name: jam-frontend\b.*?commit:\s*)([a-f0-9]+)")
+SECP256K1_COMMIT_RE = re.compile(
+    r"(?ms)(- name: libsecp256k1\b.*?commit:\s*)([a-f0-9]{40})"
+)
 JAM_PLAYWRIGHT_BASE_SERVICE_RE = re.compile(
     r"(?ms)^  jam-playwright-base:\s*\n.*?(?=^  [A-Za-z0-9][A-Za-z0-9_-]*:\s*$|\Z)"
 )
@@ -160,7 +164,7 @@ def latest_libsodium_source_url(release: dict[str, Any]) -> str:
 
 def latest_tor_version() -> str:
     html = fetch_text("https://dist.torproject.org/")
-    versions = set(re.findall(r"tor-(0\.4\.\d+\.\d+)\.tar\.gz", html))
+    versions = set(re.findall(r"tor-(\d+\.\d+\.\d+(?:\.\d+)?)\.tar\.gz", html))
     if not versions:
         raise UpdateError("Could not find Tor versions on dist.torproject.org")
     return max(
@@ -187,14 +191,14 @@ def latest_remote_commit(repo_url: str, ref: str, description: str) -> str:
     return _validate_commit(lines[0].split()[0], description)
 
 
-def parse_jam_remote_tags(output: str) -> dict[str, str]:
+def parse_remote_tags(output: str) -> dict[str, str]:
     refs: dict[str, str] = {}
     for line in output.splitlines():
         parts = line.split()
         if len(parts) != 2:
-            raise UpdateError(f"Unexpected JAM tag ref: {line}")
+            raise UpdateError(f"Unexpected Git tag ref: {line}")
         commit, remote_ref = parts
-        refs[remote_ref] = _validate_commit(commit, "JAM tag")
+        refs[remote_ref] = _validate_commit(commit, "Git tag")
 
     tags: dict[str, str] = {}
     for remote_ref, commit in refs.items():
@@ -203,6 +207,47 @@ def parse_jam_remote_tags(output: str) -> dict[str, str]:
         tag = remote_ref.removeprefix("refs/tags/")
         tags[tag] = refs.get(f"{remote_ref}^{{}}", commit)
     return tags
+
+
+def latest_secp256k1_commit() -> str:
+    release = latest_release(SECP256K1_REPO)
+    tag = release.get("tag_name", "")
+    if not isinstance(tag, str) or not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+        raise UpdateError(f"Unexpected libsecp256k1 release tag: {tag}")
+    output = subprocess.check_output(
+        [
+            "git",
+            "ls-remote",
+            f"https://github.com/{SECP256K1_REPO}.git",
+            f"refs/tags/{tag}",
+            f"refs/tags/{tag}^{{}}",
+        ],
+        text=True,
+    )
+    tags = parse_remote_tags(output)
+    if set(tags) != {tag}:
+        raise UpdateError(f"Could not resolve libsecp256k1 release commit: {tag}")
+    return tags[tag]
+
+
+def replace_secp256k1_pins(
+    manifest: str, companion_files: dict[Path, str], latest: str
+) -> tuple[str, dict[Path, str]]:
+    """Keep shipped builds and Windows instructions on the same reviewed release."""
+    latest = _validate_commit(latest, "libsecp256k1")
+    matches = list(SECP256K1_COMMIT_RE.finditer(manifest))
+    if len(matches) != 1:
+        raise UpdateError("Expected one libsecp256k1 source in the Flatpak manifest")
+    current = matches[0].group(2)
+    updated_files: dict[Path, str] = {}
+    for path, text in companion_files.items():
+        if text.count(current) != 1:
+            raise UpdateError(f"Expected one matching libsecp256k1 pin in {path}")
+        updated_files[path] = text.replace(current, latest)
+    updated_manifest = SECP256K1_COMMIT_RE.sub(
+        lambda match: f"{match.group(1)}{latest}", manifest, count=1
+    )
+    return updated_manifest, updated_files
 
 
 def jam_release_sort_key(
@@ -235,7 +280,7 @@ def latest_jam_release() -> tuple[str, str]:
     ).strip()
     tags = {
         tag: commit
-        for tag, commit in parse_jam_remote_tags(output).items()
+        for tag, commit in parse_remote_tags(output).items()
         if JAM_RELEASE_TAG_RE.fullmatch(tag) is not None
     }
     if not tags:
@@ -516,6 +561,19 @@ def main() -> int:
     current_jam_test_ref = extract_jam_test_ref(jam_pin_test_text)
     current_jam_test_commit = extract_jam_test_commit(jam_pin_test_text)
 
+    native_pin_files = {
+        path: path.read_text(encoding="utf-8")
+        for path in (
+            project_root / ".github/workflows/ci.yaml",
+            project_root / "docs/install-advanced.md",
+        )
+    }
+    latest_secp256k1 = latest_secp256k1_commit()
+    native_manifest, updated_native_pin_files = replace_secp256k1_pins(
+        manifest_text, native_pin_files, latest_secp256k1
+    )
+    current_secp256k1 = SECP256K1_COMMIT_RE.findall(manifest_text)[0][1]
+
     libevent_release = latest_release("libevent/libevent")
     latest_libevent_url = pick_asset_url(
         libevent_release,
@@ -550,6 +608,11 @@ def main() -> int:
     latest_jam_docker = latest_jam_docker_commit()
 
     changed = [
+        report_commit(
+            "libsecp256k1 (validate native and binding compatibility before release)",
+            current_secp256k1,
+            latest_secp256k1,
+        ),
         report_url_sha(
             "libevent",
             current_libevent_url,
@@ -606,7 +669,7 @@ def main() -> int:
         print("[INFO] No external dependency updates needed")
         return 0
 
-    updated_manifest = manifest_text
+    updated_manifest = native_manifest
     updated_manifest = replace_url_sha(
         LIBEVENT_RE,
         updated_manifest,
@@ -656,6 +719,8 @@ def main() -> int:
     manifest_path.write_text(updated_manifest, encoding="utf-8")
     compose_path.write_text(updated_compose, encoding="utf-8")
     jam_pin_test_path.write_text(updated_jam_pin_test, encoding="utf-8")
+    for path, text in updated_native_pin_files.items():
+        path.write_text(text, encoding="utf-8")
     print(f"[INFO] Applied {updates_needed} external dependency update(s)")
     return 0
 

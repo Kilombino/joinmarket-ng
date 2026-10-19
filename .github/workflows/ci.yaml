@@ -90,7 +90,7 @@ jobs:
             tag_suffix: ""
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -102,7 +102,7 @@ jobs:
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -112,7 +112,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -150,7 +150,7 @@ jobs:
       matrix:
         python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -205,7 +205,7 @@ jobs:
   # ==========================================================================
   # Stage 2b: install.sh smoke tests across operating systems
   # Linux (container): real Docker install in vanilla debian:stable-slim +
-  # ubuntu:24.04, verifies the script bootstraps curl/gnupg/sudo and that
+  # ubuntu:latest, verifies the script bootstraps curl/gnupg/sudo and that
   # jm-wallet --help runs in the resulting venv.
   # Linux/macOS (native): real install + Tor + signet orderbook fetch over
   # Tor against the public signet directory nodes, proving the installed
@@ -220,14 +220,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           # Intentional fork checkout; see the pull_request_target note at the top.
           allow-unsafe-pr-checkout: true
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install pytest
@@ -244,7 +244,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -294,7 +294,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -351,7 +351,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -362,7 +362,7 @@ jobs:
         run: bash -n install.sh
       - name: install.sh --help works under git-bash
         run: bash install.sh --help
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Build shared libsecp256k1
@@ -372,16 +372,18 @@ jobs:
           $build = Join-Path $source "build"
           git init $source
           git -C $source remote add origin https://github.com/bitcoin-core/secp256k1.git
-          git -C $source fetch --depth 1 origin e3a885d42a7800c1ccebad94ad1e2b82c4df5c65
+          git -C $source fetch --depth 1 origin 6e2c8bc4ecdc6e71dbe7a368f360d8d453ce435d
           git -C $source checkout --detach FETCH_HEAD
           cmake -S $source -B $build `
             -DBUILD_SHARED_LIBS=ON `
             -DSECP256K1_ENABLE_MODULE_RECOVERY=ON `
             -DSECP256K1_ENABLE_MODULE_ECDH=ON `
-            -DSECP256K1_BUILD_TESTS=OFF `
+            -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON `
+            -DSECP256K1_BUILD_TESTS=ON `
             -DSECP256K1_BUILD_BENCHMARK=OFF `
-            -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=OFF
+            -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=ON
           cmake --build $build --config Release
+          ctest --test-dir $build -C Release --output-on-failure
           $dll = Get-ChildItem -Path $build -Recurse -Filter "*secp256k1*.dll" | Select-Object -First 1
           if (-not $dll) { throw "secp256k1.dll was not produced" }
           $runtime = Join-Path $env:RUNNER_TEMP "secp256k1-runtime"
@@ -397,6 +399,13 @@ jobs:
           # Install from source in editable mode mirrors the documented
           # Windows quick start.
           pip install ./jmcore ./taker ./jmwallet
+      - name: Validate installed native cryptography
+        shell: pwsh
+        run: |
+          $env:EXPECTED_SECP256K1_DLL = Join-Path $env:RUNNER_TEMP "secp256k1-runtime\secp256k1.dll"
+          python -c "import os; from pathlib import Path; from bitcointx.core.secp256k1 import get_secp256k1; s = get_secp256k1(); print(s.lib._name, s.cap); assert Path(s.lib._name).resolve() == Path(os.environ['EXPECTED_SECP256K1_DLL']).resolve(); assert s.cap.has_pubkey_recovery and s.cap.has_ecdh and s.cap.has_schnorrsig"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest -q bitcointx.tests.test_key bitcointx.tests.test_signmessage bitcointx.tests.test_secp256k1_compat
       - name: Install Tor, start it, and fetch the signet orderbook
         shell: pwsh
         # Chocolatey's tor package is unreliable across runner images, so
@@ -416,7 +425,10 @@ jobs:
         # also matches what a real user would do (launch tor, then taker).
         run: |
           $ErrorActionPreference = "Stop"
-          $url = "https://archive.torproject.org/tor-package-archive/torbrowser/13.5.7/tor-expert-bundle-windows-x86_64-13.5.7.tar.gz"
+          $release = Invoke-RestMethod -Uri "https://aus1.torproject.org/torbrowser/update_3/release/downloads.json"
+          $version = $release.version
+          if ($version -notmatch '^\d+\.\d+(?:\.\d+)?$') { throw "Unexpected Tor Browser release version: $version" }
+          $url = "https://dist.torproject.org/torbrowser/$version/tor-expert-bundle-windows-x86_64-$version.tar.gz"
           $work = Join-Path $env:RUNNER_TEMP "tor"
           $dataDir = Join-Path $work "datadir"
           New-Item -ItemType Directory -Force -Path $work | Out-Null
@@ -510,7 +522,7 @@ jobs:
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       JMWALLETD_IMAGE: ghcr.io/${{ github.repository }}/jmwalletd:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -523,7 +535,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -632,7 +644,7 @@ jobs:
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       JMWALLETD_IMAGE: ghcr.io/${{ github.repository }}/jmwalletd:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -645,7 +657,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -766,7 +778,7 @@ jobs:
       JM_NG_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -775,26 +787,10 @@ jobs:
           allow-unsafe-pr-checkout: true
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          # Pinned below 24.16.0: that release introduced a regression that
-          # hangs `playwright install` forever during ZIP extraction (yauzl),
-          # right after the download bar reaches 100%. Our pinned Playwright
-          # (1.58.2) does not yet ship the fix, so the install step ate the
-          # whole job budget. See microsoft/playwright#40724 and #41000.
-          # Bump once Playwright releases the yauzl fix.
-          node-version: "24.15.0"
-
-      # Cache the downloaded Playwright browsers (Chrome, Chrome Headless
-      # Shell, FFmpeg) keyed on the locked Playwright version. Caching skips
-      # the download on cache hits; the bounded install step below is a safety
-      # net for genuine CDN flakiness on a cache miss.
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('tests/playwright/package-lock.json') }}
+          # Test current Node and Playwright together to catch upstream changes.
+          node-version: "node"
 
       - name: Install Playwright dependencies
         timeout-minutes: 18
@@ -810,7 +806,7 @@ jobs:
         run: npx playwright test -c playwright.obwatcher.config.ts
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -893,7 +889,7 @@ jobs:
     env:
       DIRECTORY_SERVER_IMAGE: ghcr.io/${{ github.repository }}/directory-server:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -906,7 +902,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -968,7 +964,7 @@ jobs:
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -981,7 +977,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1144,7 +1140,7 @@ jobs:
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -1157,7 +1153,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1318,7 +1314,7 @@ jobs:
       DIRECTORY_SERVER_IMAGE: ghcr.io/${{ github.repository }}/directory-server:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -1331,7 +1327,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1374,7 +1370,7 @@ jobs:
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -1387,7 +1383,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1500,7 +1496,7 @@ jobs:
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -1513,7 +1509,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1637,7 +1633,7 @@ jobs:
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -1660,7 +1656,7 @@ jobs:
             werkzeug
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -1826,7 +1822,7 @@ jobs:
       MAKER_IMAGE: ghcr.io/${{ github.repository }}/maker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
       TAKER_IMAGE: ghcr.io/${{ github.repository }}/taker:ci-unsafe-do-not-run-${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -1839,7 +1835,7 @@ jobs:
           install-dev: 'true'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -2020,7 +2016,7 @@ jobs:
             tag_suffix: ""
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -2028,7 +2024,7 @@ jobs:
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -2038,7 +2034,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ARM64 image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -2108,7 +2104,7 @@ jobs:
             tag_suffix: ""
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -2116,12 +2112,12 @@ jobs:
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
           platforms: linux/arm/v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -2131,7 +2127,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ARMv7 image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -2247,12 +2243,12 @@ jobs:
             tag_suffix: ""
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

@@ -54,7 +54,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Full history so verify-release.sh can compare the installer asset
           # with install.sh at the release commit.

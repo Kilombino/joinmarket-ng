@@ -39,7 +39,26 @@ def test_manifest_builds_recovery_enabled_libsecp256k1() -> None:
     assert "-DSECP256K1_ENABLE_MODULE_RECOVERY=ON" in secp_module["config-opts"]
     source = secp_module["sources"][0]
     assert source["type"] == "git"
-    assert source["commit"] == "e3a885d42a7800c1ccebad94ad1e2b82c4df5c65"
+    commit = source["commit"]
+    assert re.fullmatch(r"[a-f0-9]{40}", commit)
+    project_root = Path(__file__).resolve().parents[1]
+    for relative_path in (".github/workflows/ci.yaml", "docs/install-advanced.md"):
+        assert (
+            f"fetch --depth 1 origin {commit}"
+            in (project_root / relative_path).read_text()
+        )
+    assert secp_module["run-tests"] is True
+    assert "-DSECP256K1_BUILD_TESTS=ON" in secp_module["config-opts"]
+    assert "-DSECP256K1_BUILD_EXHAUSTIVE_TESTS=ON" in secp_module["config-opts"]
+
+
+def test_manifest_build_and_runtime_share_the_python_path() -> None:
+    manifest = _manifest()
+    application = next(
+        module for module in manifest["modules"] if module["name"] == "jam-ng"
+    )
+    python_path = application["build-options"]["env"]["PYTHONPATH"]
+    assert f"--env=PYTHONPATH={python_path}" in manifest["finish-args"]
 
 
 def test_latest_appstream_release_matches_project_version() -> None:

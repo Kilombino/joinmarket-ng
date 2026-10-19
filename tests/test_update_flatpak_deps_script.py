@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 
 def _load_update_flatpak_deps_module():
     script_path = (
@@ -231,7 +233,7 @@ def test_latest_jam_release_includes_prereleases(monkeypatch) -> None:
     )
 
 
-def test_parse_jam_remote_tags_prefers_peeled_commit() -> None:
+def test_parse_remote_tags_prefers_peeled_commit() -> None:
     module = _load_update_flatpak_deps_module()
     tag_object = "a" * 40
     commit = "b" * 40
@@ -239,14 +241,14 @@ def test_parse_jam_remote_tags_prefers_peeled_commit() -> None:
         f"{tag_object}\trefs/tags/v2.0.0-beta.2\n"
         f"{commit}\trefs/tags/v2.0.0-beta.2^{{}}\n"
     )
-    assert module.parse_jam_remote_tags(output)["v2.0.0-beta.2"] == commit
+    assert module.parse_remote_tags(output)["v2.0.0-beta.2"] == commit
 
 
-def test_parse_jam_remote_tags_keeps_lightweight_commit() -> None:
+def test_parse_remote_tags_keeps_lightweight_commit() -> None:
     module = _load_update_flatpak_deps_module()
     commit = "a" * 40
 
-    assert module.parse_jam_remote_tags(f"{commit}\trefs/tags/v2.0.0-beta.2\n") == {
+    assert module.parse_remote_tags(f"{commit}\trefs/tags/v2.0.0-beta.2\n") == {
         "v2.0.0-beta.2": commit
     }
 
@@ -314,6 +316,58 @@ def test_latest_tor_version_selects_highest(monkeypatch) -> None:
     monkeypatch.setattr(module, "fetch_text", lambda _url: html)
 
     assert module.latest_tor_version() == "0.4.9.6"
+
+
+def test_latest_tor_version_does_not_freeze_the_release_series(monkeypatch) -> None:
+    module = _load_update_flatpak_deps_module()
+    monkeypatch.setattr(
+        module,
+        "fetch_text",
+        lambda _url: "tor-0.4.9.6.tar.gz tor-1.0.0.tar.gz tor-1.1.0-alpha.tar.gz",
+    )
+    assert module.latest_tor_version() == "1.0.0"
+
+
+def test_native_pin_update_is_coordinated_and_preserves_unrelated_sources() -> None:
+    module = _load_update_flatpak_deps_module()
+    old, new, other = "a" * 40, "b" * 40, "c" * 40
+    manifest = (
+        f"- name: libsecp256k1\n  commit: {old}\n- name: other\n  commit: {other}\n"
+    )
+    files = {
+        Path("ci.yaml"): f"git fetch origin {old}",
+        Path("install.md"): f"pin: {old}",
+    }
+    updated, companions = module.replace_secp256k1_pins(manifest, files, new)
+    assert f"commit: {new}" in updated
+    assert f"commit: {other}" in updated
+    assert companions == {path: text.replace(old, new) for path, text in files.items()}
+    assert module.replace_secp256k1_pins(updated, companions, new) == (
+        updated,
+        companions,
+    )
+
+
+def test_native_pin_update_rejects_drift_before_changing_files() -> None:
+    module = _load_update_flatpak_deps_module()
+    manifest = f"- name: libsecp256k1\n  commit: {'a' * 40}\n"
+    files = {Path("ci.yaml"): f"git fetch origin {'b' * 40}"}
+    with pytest.raises(module.UpdateError, match="matching libsecp256k1 pin"):
+        module.replace_secp256k1_pins(manifest, files, "c" * 40)
+
+
+def test_native_release_resolution_uses_the_peeled_tag(monkeypatch) -> None:
+    module = _load_update_flatpak_deps_module()
+    tag, commit = "v9.8.7", "b" * 40
+    monkeypatch.setattr(module, "latest_release", lambda _repo: {"tag_name": tag})
+    monkeypatch.setattr(
+        module.subprocess,
+        "check_output",
+        lambda *_args, **_kwargs: (
+            f"{'a' * 40}\trefs/tags/{tag}\n{commit}\trefs/tags/{tag}^{{}}\n"
+        ),
+    )
+    assert module.latest_secp256k1_commit() == commit
 
 
 def test_latest_libsodium_source_url_prefers_release_asset() -> None:

@@ -18,7 +18,7 @@
 # =============================================================================
 id: org.joinmarketng.JamNG
 runtime: org.freedesktop.Platform
-runtime-version: '25.08'
+runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 command: jam-ng
 
@@ -38,7 +38,7 @@ finish-args:
   # X11 shared memory transport (for XWayland sessions)
   - --share=ipc
   # Python packages installed to /app prefix
-  - --env=PYTHONPATH=/app/lib/python3.13/site-packages
+  - --env=PYTHONPATH=/app/lib/python3.14/site-packages
 
 cleanup:
   - /include
@@ -90,17 +90,18 @@ modules:
   # =========================================================================
   - name: libsecp256k1
     buildsystem: cmake-ninja
+    run-tests: true
     config-opts:
       - -DSECP256K1_ENABLE_MODULE_RECOVERY=ON
       - -DSECP256K1_ENABLE_MODULE_ECDH=ON
       - -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON
       - -DSECP256K1_BUILD_BENCHMARK=OFF
-      - -DSECP256K1_BUILD_TESTS=OFF
-      - -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=OFF
+      - -DSECP256K1_BUILD_TESTS=ON
+      - -DSECP256K1_BUILD_EXHAUSTIVE_TESTS=ON
     sources:
       - type: git
         url: https://github.com/bitcoin-core/secp256k1.git
-        commit: e3a885d42a7800c1ccebad94ad1e2b82c4df5c65
+        commit: 6e2c8bc4ecdc6e71dbe7a368f360d8d453ce435d
 
   # =========================================================================
   # Module 5: neutrino-api (pre-built Go binary)
@@ -165,7 +166,7 @@ modules:
       build-args:
         - --share=network
       env:
-        PYTHONPATH: /app/lib/python3.13/site-packages
+        PYTHONPATH: /app/lib/python3.14/site-packages
     build-commands:
       # Ensure pip and build tools are available
       - pip3 install --no-cache-dir --ignore-installed --prefix=/app setuptools wheel
@@ -189,6 +190,14 @@ modules:
       # Install our packages (no-deps since requirements handle dependencies)
       - pip3 install --no-cache-dir --ignore-installed --no-deps --prefix=/app
           ./jmcore ./jmwallet ./maker ./taker ./tumbler ./orderbook_watcher ./jmwalletd
+
+      # Fail the build if the packaged binding cannot load the required modules.
+      - >-
+        python3 -c "from bitcointx.core.secp256k1 import get_secp256k1;
+        s = get_secp256k1(); print('Native library:', s.lib._name, s.cap);
+        assert s.cap.has_pubkey_recovery and s.cap.has_ecdh and s.cap.has_schnorrsig"
+      - python3 -m unittest -q bitcointx.tests.test_key bitcointx.tests.test_signmessage
+          bitcointx.tests.test_secp256k1_compat
 
       # Install entrypoint script and stop helper
       - install -Dm755 flatpak/jam-ng-entrypoint.sh /app/bin/jam-ng

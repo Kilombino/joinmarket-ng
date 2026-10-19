@@ -85,6 +85,8 @@ site/
 docs/api/
 
 # Playwright
+# Test tooling deliberately resolves fresh versions instead of a lockfile.
+tests/playwright/package-lock.json
 tests/playwright/node_modules/
 tests/playwright/playwright-report/
 tests/playwright/test-results/

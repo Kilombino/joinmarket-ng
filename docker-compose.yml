@@ -979,10 +979,13 @@ services:
   # ============================================================================
 
   # Bitcoin Core node specifically for JAM (requires legacy wallets)
-  # Uses v28.0 with -deprecatedrpc=create_bdb for legacy wallet support
+  # Tracks Core 28's patch releases with -deprecatedrpc=create_bdb.
   # Peers with the main bitcoin node to share the same blockchain
   bitcoin-jam:
-    image: lncm/bitcoind:v28.0
+    image: joinmarket-ng-bitcoin-jam:local
+    build:
+      context: .
+      dockerfile: tests/e2e/bitcoin-jam/Dockerfile
     container_name: jm-bitcoin-jam
     restart: unless-stopped
     logging:
@@ -997,6 +1000,7 @@ services:
       retries: 10
       test: ["CMD-SHELL", "bitcoin-cli -chain=regtest -rpcport=18445 -rpcuser=test -rpcpassword=test getblockchaininfo"]
     command:
+      - '-datadir=/data/.bitcoin'
       - '-server=1'
       - '-regtest=1'
       - '-rpcuser=test'
@@ -1029,7 +1033,10 @@ services:
 
   # Miner for bitcoin-jam node (creates legacy wallet and mines)
   miner-jam:
-    image: lncm/bitcoind:v28.0
+    image: joinmarket-ng-bitcoin-jam:local
+    build:
+      context: .
+      dockerfile: tests/e2e/bitcoin-jam/Dockerfile
     container_name: jm-miner-jam
     restart: unless-stopped
     logging:

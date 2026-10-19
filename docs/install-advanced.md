@@ -175,7 +175,7 @@ Prerequisites:
 
 - Windows 10 or later (or Windows Server 2022 or later).
 - Python 3.11 or later from python.org, with "Add Python to PATH" selected.
-- PowerShell 7 or later (or Windows PowerShell 5), Git, CMake, and Visual
+- PowerShell 7 or later (or Windows PowerShell 5), Git, CMake 3.22 or later, and Visual
   Studio 2022 Build Tools with the C++ build tools workload.
 - Tor from the [Tor Expert Bundle](https://www.torproject.org/download/tor/).
 
@@ -191,7 +191,7 @@ $secpSource = Join-Path $PWD "tmp\secp256k1"
 $secpBuild = Join-Path $secpSource "build"
 git init $secpSource
 git -C $secpSource remote add origin https://github.com/bitcoin-core/secp256k1.git
-git -C $secpSource fetch --depth 1 origin e3a885d42a7800c1ccebad94ad1e2b82c4df5c65
+git -C $secpSource fetch --depth 1 origin 6e2c8bc4ecdc6e71dbe7a368f360d8d453ce435d
 git -C $secpSource checkout --detach FETCH_HEAD
 cmake -S $secpSource -B $secpBuild `
   -DBUILD_SHARED_LIBS=ON `
@@ -206,6 +206,11 @@ Copy-Item $secpDll.FullName .\.venv\Scripts\secp256k1.dll
 python -m pip install --upgrade pip
 pip install .\jmcore .\jmwallet .\taker
 ```
+
+When upgrading an existing Windows installation, rebuild and replace its
+`.venv\Scripts\secp256k1.dll` with the updated library, then restart the running
+components. Updating Python packages alone does not replace that DLL. No wallet
+migration or rescan is needed.
 
 To also run a maker and tumbler:
 
