@@ -899,6 +899,17 @@ For full documentation, see [jmwallet Documentation](https://joinmarket-ng.githu
 │                                                       cj-change, deposit,    │
 │                                                       reg-change) plus       │
 │                                                       fidelity bonds.        │
+│ --view                                        <str>   Extended-view layout:  │
+│                                                       'legacy' (the existing │
+│                                                       layout, default) or    │
+│                                                       'full' (pipe-aligned   │
+│                                                       table, one line per    │
+│                                                       UTXO, exact            │
+│                                                       confirmation counts,   │
+│                                                       explicit spendable     │
+│                                                       state). Requires       │
+│                                                       --extended.            │
+│                                                       [default: legacy]      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 

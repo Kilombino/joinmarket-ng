@@ -17,7 +17,7 @@ ARG WHEEL_VERSION=0.48.0
 # Pins the whole transitive package closure so the build keeps reproducing
 # after the live archive rotates. See scripts/docker-apt-install.sh.
 # Update with: ./scripts/update-base-images.sh
-ARG DEBIAN_SNAPSHOT=20261012T082414Z
+ARG DEBIAN_SNAPSHOT=20261019T022707Z
 
 # =============================================================================
 # Stage 1: Build Python environment
