@@ -1,3 +1,24 @@
 HiddenServiceDir /var/lib/tor
 HiddenServiceVersion 3
 HiddenServicePort 5222 directory_server:5222
+
+# Onion service DoS defenses. These are per-service options and must stay
+# below the HiddenServiceDir line above.
+#
+# Introduction rate limiting (Tor 0.4.2+): introduction points drop INTRODUCE2
+# cells above this rate, so a flood of connection attempts is absorbed by the
+# relays instead of this host. Normal directory traffic is far below the
+# limit, so honest clients are unaffected.
+HiddenServiceEnableIntroDoSDefense 1
+HiddenServiceEnableIntroDoSRatePerSec 25
+HiddenServiceEnableIntroDoSBurstPerSec 200
+
+# Proof of work (Tor 0.4.8+): clients must solve a puzzle whose effort scales
+# with the rendezvous backlog, so a flood costs the attacker CPU. The effort
+# starts at zero and only rises under load. It requires a Tor built with the
+# pow module (`tor --list-modules` must show `pow: yes`, which needs
+# `--enable-gpl` at build time); Tor refuses to start when these options are
+# set on a build without it. Uncomment once your Tor image has the module.
+#HiddenServicePoWDefensesEnabled 1
+#HiddenServicePoWQueueRate 25
+#HiddenServicePoWQueueBurst 250
