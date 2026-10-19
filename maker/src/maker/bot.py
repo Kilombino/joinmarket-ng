@@ -483,11 +483,17 @@ class MakerBot(BackgroundTasksMixin, ProtocolHandlersMixin, DirectConnectionMixi
             # Note: intro_dos is NOT supported for ephemeral HS, don't list it as active
             # Note: PoW via ADD_ONION requires Tor 0.4.9.2+
             if dos_config.pow_enabled and caps and caps.has_add_onion_pow:
-                defenses.append("PoW=enabled")
+                # Tor accepts the ADD_ONION PoW flags and returns success even
+                # when it was built without the pow module, and offers no
+                # control-port query for it, so this cannot be verified here.
+                defenses.append("PoW=requested")
             if dos_config.max_streams:
                 defenses.append(f"max_streams={dos_config.max_streams}")
             if defenses:
-                logger.info(f"Tor DoS defenses active: {', '.join(defenses)}")
+                logger.info(
+                    f"Tor DoS defenses: {', '.join(defenses)} "
+                    "(PoW is only effective if `tor --list-modules` shows `pow: yes`)"
+                )
             else:
                 logger.info(
                     "No Tor-level DoS defenses active for ephemeral HS "

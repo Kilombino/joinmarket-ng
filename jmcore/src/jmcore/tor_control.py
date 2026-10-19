@@ -601,7 +601,7 @@ class TorControlClient:
                 cmd_parts.append(f"PoWQueueRate={dos_config.pow_queue_rate}")
                 cmd_parts.append(f"PoWQueueBurst={dos_config.pow_queue_burst}")
                 logger.info(
-                    f"Enabling PoW defense: queue_rate={dos_config.pow_queue_rate}/s, "
+                    f"Requesting PoW defense: queue_rate={dos_config.pow_queue_rate}/s, "
                     f"queue_burst={dos_config.pow_queue_burst}"
                 )
             elif dos_config.pow_enabled and caps.has_pow_module and not caps.has_add_onion_pow:
@@ -721,11 +721,13 @@ class TorControlClient:
         version = await self.get_version()
         caps = TorCapabilities.from_version(version)
 
-        # Try to detect actual PoW module availability
+        # Check that this Tor knows the PoW options at all. This does not prove
+        # the pow module is compiled in: Tor registers the option names
+        # unconditionally, accepts the ADD_ONION flags on builds without the
+        # module, and exposes no control-port query for module availability.
+        # Only `tor --list-modules` on the host answers that.
         if caps.version_tuple >= (0, 4, 8):
             try:
-                # Check if pow module is compiled in by trying to get its status
-                # This will fail gracefully if not available
                 modules_info = await self.get_info("config/names")
                 caps.has_pow_module = "HiddenServicePoW" in modules_info
             except TorControlError:
