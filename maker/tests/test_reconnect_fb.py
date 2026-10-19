@@ -99,7 +99,8 @@ async def test_reconnect_does_not_announce_bond_publicly(
         patch.object(
             bot, "_format_offer_announcement", wraps=bot._format_offer_announcement
         ) as mock_format,
-        patch("asyncio.sleep", side_effect=[0, 0, asyncio.CancelledError()]),
+        # One reconnect pass right after the initial delay, then stop.
+        patch("asyncio.sleep", side_effect=[0, asyncio.CancelledError()]),
     ):
         mock_notifier.return_value = MagicMock()
         mock_notifier.return_value.notify_directory_reconnect = AsyncMock()
@@ -128,7 +129,9 @@ async def test_reconnect_does_not_announce_bond_publicly(
 
 
 @pytest.mark.asyncio
-async def test_periodic_reconnect_dials_directories_concurrently(mock_wallet, mock_backend):
+async def test_periodic_reconnect_dials_directories_concurrently(
+    mock_wallet, mock_backend, sample_offer
+):
     """One unreachable directory must not delay reconnection to the others.
 
     A dead onion costs the full Tor connect timeout, so sequential dialing
@@ -142,11 +145,13 @@ async def test_periodic_reconnect_dials_directories_concurrently(mock_wallet, mo
     bot = MakerBot(wallet=mock_wallet, backend=mock_backend, config=config)
     bot.running = True
     bot.directory_clients = {}
+    bot.current_offers = [sample_offer]
 
     dead_started = asyncio.Event()
     release_dead = asyncio.Event()
     alive_client = MagicMock()
-    alive_client.send_public_message = AsyncMock(return_value=None)
+    announced = asyncio.Event()
+    alive_client.send_public_message = AsyncMock(side_effect=lambda *_: announced.set())
 
     async def connect(dir_server: str):
         if dir_server.startswith("dead"):
@@ -159,11 +164,12 @@ async def test_periodic_reconnect_dials_directories_concurrently(mock_wallet, mo
         return ("alive.onion:5222", alive_client)
 
     bot._connect_to_directory = AsyncMock(side_effect=connect)
-    sleeps = {"n": 0}
+    sleeps: list[float] = []
 
-    async def fake_sleep(_delay: float) -> None:
-        sleeps["n"] += 1
-        if sleeps["n"] > 2:
+    async def fake_sleep(delay: float) -> None:
+        # The first pass runs right after the initial delay, not an interval later.
+        sleeps.append(delay)
+        if len(sleeps) > 1:
             raise asyncio.CancelledError()
 
     with (
@@ -174,13 +180,17 @@ async def test_periodic_reconnect_dials_directories_concurrently(mock_wallet, mo
         mock_notifier.return_value.notify_directory_reconnect = AsyncMock()
         mock_notifier.return_value.notify_all_directories_reconnected = AsyncMock()
         task = asyncio.create_task(bot._periodic_directory_reconnect())
-        # The pass cannot finish until the dead dial is released.
         await asyncio.wait_for(dead_started.wait(), timeout=2.0)
+        # The healthy directory is installed and announced while the dead
+        # dial is still blocked; offers must not wait on a Tor timeout.
+        await asyncio.wait_for(announced.wait(), timeout=2.0)
+        assert "alive.onion:5222" in bot.directory_clients
+        assert bot._directory_reconnect_attempts.get("dead.onion:5222") is None
         release_dead.set()
         try:
             await asyncio.wait_for(task, timeout=2.0)
         except asyncio.CancelledError:
             pass
 
-    assert "alive.onion:5222" in bot.directory_clients
+    assert sleeps[0] == 60.0
     assert bot._directory_reconnect_attempts.get("dead.onion:5222") == 1

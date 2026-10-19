@@ -199,6 +199,15 @@ class MakerBotProtocol(Protocol):
 
     async def _connect_to_directories_with_retry(self) -> None: ...
 
+    async def _install_reconnected_directory(
+        self,
+        generation: MakerGeneration,
+        generation_id: int,
+        dir_server: str,
+        node_id: str,
+        result: tuple[str, DirectoryClient] | None,
+    ) -> None: ...
+
     async def _listen_client(
         self, node_id: str, client: DirectoryClient, generation_id: int | None = None
     ) -> None: ...

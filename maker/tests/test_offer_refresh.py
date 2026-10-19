@@ -439,7 +439,8 @@ async def test_reconnected_directory_receives_cancels_before_current_offers(
         with (
             patch("maker.background_tasks.get_notifier") as notifier,
             patch("maker.background_tasks.spawn_task", side_effect=lambda coro: coro.close()),
-            patch("asyncio.sleep", side_effect=[0, 0, asyncio.CancelledError()]),
+            # One reconnect pass right after the initial delay, then stop.
+            patch("asyncio.sleep", side_effect=[0, asyncio.CancelledError()]),
         ):
             notifier.return_value = MagicMock()
             await bot._periodic_directory_reconnect()

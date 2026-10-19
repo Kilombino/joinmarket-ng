@@ -29,6 +29,26 @@ from maker.rate_limiting import DirectConnectionRateLimiter, OrderbookRateLimite
 if TYPE_CHECKING:
     from jmwallet.history import TransactionHistoryEntry
 
+    from maker.generation import MakerGeneration
+
+
+# Delay before the first directory reconnect pass after startup.
+_INITIAL_RECONNECT_DELAY_SEC = 60.0
+
+
+async def _abandon_dials(
+    pending: set[asyncio.Task[tuple[str, DirectoryClient] | None]],
+) -> None:
+    """Cancel unfinished directory dials and close any client they still return."""
+    for task in pending:
+        task.cancel()
+    # Children's CancelledError comes back as a value; our own cancellation
+    # still propagates.
+    for outcome in await asyncio.gather(*pending, return_exceptions=True):
+        if isinstance(outcome, tuple):
+            with contextlib.suppress(Exception):
+                await outcome[1].close()
+
 
 class BackgroundTasksMixin:
     """Mixin class providing background task methods for MakerBot.
@@ -305,17 +325,20 @@ class BackgroundTasksMixin:
         - Starts a listener task for the directory
         - Announces current offers to the newly connected directory
         """
-        # Wait for initial connections to settle
-        await asyncio.sleep(60)
-
         logger.debug(
             f"Directory reconnection task started "
             f"(interval: {self.config.directory_reconnect_interval}s)"
         )
 
+        # The first pass runs once initial connections have settled, not a
+        # full interval later: startup keeps only the directories that
+        # answered within its settle grace, and a maker that sits on one
+        # directory for minutes is invisible to takers using the others.
+        delay = _INITIAL_RECONNECT_DELAY_SEC
         while self.running:
             try:
-                await asyncio.sleep(self.config.directory_reconnect_interval)
+                await asyncio.sleep(delay)
+                delay = self.config.directory_reconnect_interval
 
                 generation = self._generation()
                 if generation is None or generation.state is not GenerationState.ACCEPTING:
@@ -362,96 +385,58 @@ class BackgroundTasksMixin:
                         continue
                     eligible.append((dir_server, node_id))
 
-                results = await asyncio.gather(
-                    *(self._connect_to_directory(dir_server) for dir_server, _ in eligible),
-                    return_exceptions=True,
-                )
-
-                for (dir_server, node_id), outcome in zip(eligible, results, strict=True):
-                    if isinstance(outcome, BaseException):
-                        reconnect_attempts[node_id] = reconnect_attempts.get(node_id, 0) + 1
-                        logger.debug(f"Reconnection to {dir_server} raised: {outcome}")
-                        continue
-                    result = outcome
-                    attempts = reconnect_attempts.get(node_id, 0)
-
-                    # Rotation may complete while a Tor connection is being
-                    # established. Never install a client prepared for a stale
-                    # identity into the new generation.
-                    if (
-                        generation.state is not GenerationState.ACCEPTING
-                        or self.current_generation_id != generation_id
-                        or self._generation(generation_id) is not generation
-                    ):
-                        for stale in results:
-                            if isinstance(stale, tuple):
-                                with contextlib.suppress(Exception):
-                                    await stale[1].close()
-                        break
-
-                    if result:
-                        new_node_id, client = result
-                        clients[new_node_id] = client
-
-                        # Reset retry counter on success
-                        reconnect_attempts.pop(node_id, None)
-
-                        logger.debug(f"Reconnected to directory: {dir_server}")
-
-                        # Announce the currently exposed offers to the newly
-                        # connected directory. Public broadcasts MUST NOT
-                        # include the fidelity bond proof. Takers receive the
-                        # bond via privmsg in response to !orderbook, matching
-                        # the reference protocol (see jmdaemon/message_channel.py
-                        # in joinmarket-clientserver, which asserts
-                        # `fidelity_bond_proof_msg is None` for public pit
-                        # announcements).
-                        #
-                        # Queueing instead of sending directly keeps this
-                        # ordered behind any cancellation this directory still
-                        # owes, and keeps a failed message for a later retry.
-                        delivery = generation.offer_delivery
-                        delivery.queue(
-                            [new_node_id],
-                            {
-                                offer.oid: self._format_offer_announcement(
-                                    offer, include_bond=False
-                                )
-                                # Read at queue time: an offer refresh may have
-                                # adopted new terms since this cycle started.
-                                for offer in generation.current_offers
-                            },
+                # Each directory is installed as soon as its own handshake
+                # completes. A dead onion holds its dial for the full Tor
+                # timeout, and offers must not wait on it to reach the
+                # directories that already answered.
+                dials: dict[asyncio.Task[tuple[str, DirectoryClient] | None], tuple[str, str]] = {
+                    asyncio.create_task(self._connect_to_directory(dir_server)): (
+                        dir_server,
+                        node_id,
+                    )
+                    for dir_server, node_id in eligible
+                }
+                pending = set(dials)
+                try:
+                    while pending:
+                        done, pending = await asyncio.wait(
+                            pending, return_when=asyncio.FIRST_COMPLETED
                         )
-                        await delivery.flush({new_node_id: client})
+                        # Configured order among simultaneous completions.
+                        completed = [task for task in dials if task in done]
+                        stale = False
+                        for task in completed:
+                            dir_server, node_id = dials[task]
+                            attempts = reconnect_attempts.get(node_id, 0)
+                            try:
+                                result = task.result()
+                            except Exception as e:
+                                reconnect_attempts[node_id] = attempts + 1
+                                logger.debug(f"Reconnection to {dir_server} raised: {e}")
+                                continue
 
-                        # Start listener task.
-                        # Prune completed tasks first to prevent listen_tasks from growing
-                        # unboundedly on repeated reconnection cycles
-                        self._prune_done_tasks()
-                        task = asyncio.create_task(
-                            self._listen_client(new_node_id, client, generation_id=generation_id)
-                        )
-                        generation.tasks.append(task)
-                        self.listen_tasks.append(task)
-
-                        # Notify reconnection
-                        connected_count = len(clients)
-                        total_count = len(self.config.directory_servers)
-                        spawn_task(
-                            get_notifier().notify_directory_reconnect(
-                                new_node_id, connected_count, total_count
+                            # Rotation may complete while a Tor connection is
+                            # being established. Never install a client
+                            # prepared for a stale identity into the new
+                            # generation.
+                            stale = stale or (
+                                generation.state is not GenerationState.ACCEPTING
+                                or self.current_generation_id != generation_id
+                                or self._generation(generation_id) is not generation
                             )
-                        )
+                            if stale:
+                                if result is not None:
+                                    with contextlib.suppress(Exception):
+                                        await result[1].close()
+                                continue
 
-                        self._resolve_directory_outage(connected_count)
-                    else:
-                        # Increment retry counter
-                        reconnect_attempts[node_id] = attempts + 1
-                        logger.debug(
-                            f"Reconnection to {dir_server} failed "
-                            f"(attempt {attempts + 1}"
-                            f"{f'/{max_retries}' if max_retries > 0 else ''})"
-                        )
+                            await self._install_reconnected_directory(
+                                generation, generation_id, dir_server, node_id, result
+                            )
+                        if stale:
+                            break
+                finally:
+                    await _abandon_dials(pending)
 
             except asyncio.CancelledError:
                 logger.debug("Directory reconnection task cancelled")
@@ -460,6 +445,79 @@ class BackgroundTasksMixin:
                 logger.error(f"Error in directory reconnection task: {e}")
 
         logger.debug("Directory reconnection task stopped")
+
+    async def _install_reconnected_directory(
+        self: MakerBotProtocol,
+        generation: MakerGeneration,
+        generation_id: int,
+        dir_server: str,
+        node_id: str,
+        result: tuple[str, DirectoryClient] | None,
+    ) -> None:
+        """Record one reconnect outcome: install and announce on success, count a failure."""
+        clients = self.directory_clients
+        reconnect_attempts = self._directory_reconnect_attempts
+        max_retries = self.config.directory_reconnect_max_retries
+        attempts = reconnect_attempts.get(node_id, 0)
+        if result:
+            new_node_id, client = result
+            clients[new_node_id] = client
+
+            # Reset retry counter on success
+            reconnect_attempts.pop(node_id, None)
+
+            logger.debug(f"Reconnected to directory: {dir_server}")
+
+            # Announce the currently exposed offers to the newly
+            # connected directory. Public broadcasts MUST NOT
+            # include the fidelity bond proof. Takers receive the
+            # bond via privmsg in response to !orderbook, matching
+            # the reference protocol (see jmdaemon/message_channel.py
+            # in joinmarket-clientserver, which asserts
+            # `fidelity_bond_proof_msg is None` for public pit
+            # announcements).
+            #
+            # Queueing instead of sending directly keeps this
+            # ordered behind any cancellation this directory still
+            # owes, and keeps a failed message for a later retry.
+            delivery = generation.offer_delivery
+            delivery.queue(
+                [new_node_id],
+                {
+                    offer.oid: self._format_offer_announcement(offer, include_bond=False)
+                    # Read at queue time: an offer refresh may have
+                    # adopted new terms since this cycle started.
+                    for offer in generation.current_offers
+                },
+            )
+            await delivery.flush({new_node_id: client})
+
+            # Start listener task.
+            # Prune completed tasks first to prevent listen_tasks from growing
+            # unboundedly on repeated reconnection cycles
+            self._prune_done_tasks()
+            task = asyncio.create_task(
+                self._listen_client(new_node_id, client, generation_id=generation_id)
+            )
+            generation.tasks.append(task)
+            self.listen_tasks.append(task)
+
+            # Notify reconnection
+            connected_count = len(clients)
+            total_count = len(self.config.directory_servers)
+            spawn_task(
+                get_notifier().notify_directory_reconnect(new_node_id, connected_count, total_count)
+            )
+
+            self._resolve_directory_outage(connected_count)
+        else:
+            # Increment retry counter
+            reconnect_attempts[node_id] = attempts + 1
+            logger.debug(
+                f"Reconnection to {dir_server} failed "
+                f"(attempt {attempts + 1}"
+                f"{f'/{max_retries}' if max_retries > 0 else ''})"
+            )
 
     async def _monitor_pending_transactions(self: MakerBotProtocol) -> None:
         """

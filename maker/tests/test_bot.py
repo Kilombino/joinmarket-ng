@@ -2834,10 +2834,21 @@ class TestDirectoryReconnection:
         mock_notifier.notify_directory_reconnect = reconnect_notify
         mock_notifier.notify_all_directories_reconnected = recovery_notify
 
+        real_create_task = asyncio.create_task
+
         def create_task_stub(coro: object, **_kwargs: object) -> MagicMock:
             if asyncio.iscoroutine(coro):
                 coro.close()
             return MagicMock()
+
+        def create_task_without_listener(coro: object, **kwargs: object) -> object:
+            # Swallow only the listener for the MagicMock client; directory
+            # dials are real tasks the reconnect loop waits on.
+            if asyncio.iscoroutine(coro) and getattr(coro, "__qualname__", "").endswith(
+                "_listen_client"
+            ):
+                return create_task_stub(coro)
+            return real_create_task(coro, **kwargs)  # type: ignore[arg-type]
 
         with (
             patch.object(
@@ -2846,7 +2857,10 @@ class TestDirectoryReconnection:
                 AsyncMock(return_value=("dir1.onion:5222", mock_client)),
             ),
             patch("maker.background_tasks.asyncio.sleep", side_effect=sleep_and_stop),
-            patch("maker.background_tasks.asyncio.create_task", side_effect=create_task_stub),
+            patch(
+                "maker.background_tasks.asyncio.create_task",
+                side_effect=create_task_without_listener,
+            ),
             patch("maker.background_tasks.get_notifier", return_value=mock_notifier),
             patch("maker.background_tasks.spawn_task", side_effect=create_task_stub),
             patch("maker.bot.get_notifier", return_value=mock_notifier),
@@ -2878,10 +2892,21 @@ class TestDirectoryReconnection:
 
         recovery_notify = AsyncMock(return_value=True)
 
+        real_create_task = asyncio.create_task
+
         def create_task_stub(coro: object, **_kwargs: object) -> MagicMock:
             if asyncio.iscoroutine(coro):
                 coro.close()
             return MagicMock()
+
+        def create_task_without_listener(coro: object, **kwargs: object) -> object:
+            # Swallow only the listener for the MagicMock client; directory
+            # dials are real tasks the reconnect loop waits on.
+            if asyncio.iscoroutine(coro) and getattr(coro, "__qualname__", "").endswith(
+                "_listen_client"
+            ):
+                return create_task_stub(coro)
+            return real_create_task(coro, **kwargs)  # type: ignore[arg-type]
 
         with (
             patch.object(
@@ -2890,7 +2915,10 @@ class TestDirectoryReconnection:
                 AsyncMock(return_value=("dir1.onion:5222", mock_client)),
             ),
             patch("maker.background_tasks.asyncio.sleep", side_effect=sleep_and_stop),
-            patch("maker.background_tasks.asyncio.create_task", side_effect=create_task_stub),
+            patch(
+                "maker.background_tasks.asyncio.create_task",
+                side_effect=create_task_without_listener,
+            ),
             patch("maker.background_tasks.get_notifier") as mock_get_notifier,
         ):
             mock_notifier = MagicMock()
