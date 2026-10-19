@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-10-19
+
+Fix log flooding caused by a new DoS attack, and harden DoS resistance. New opt-in `--view full` layout for `jm-wallet info --extended` with a pipe-table layout, compact status vocabulary, and a dedicated fidelity-bond table. Alognside dependency updates, new configuration options, and several bug fixes.
+
+### Added
+
+- Make maker orderbook response burst capacities and refill rates configurable ([8d19eeeb](../../commit/8d19eeebe4403c0476b7809bc4f80dd731939f5e))
+- Add opt-in `--view full` layout for `jm-wallet info --extended`: pipe-table layout with compact status vocabulary and a dedicated fidelity-bond table; new wallet.info_show_fidelity_bonds setting ([42fda31a](../../commit/42fda31af8cb251d080e93968247bfb2b83f0afe))
+- Enable Tor introduction-point rate limiting for the Docker directory server ([9b6d7958](../../commit/9b6d795858b0e81720f87a06eb2aed976249461f))
+
+### Fixed
+
+- Allow spending fidelity bonds locked until 2038-02 or later ([73c5cd57](../../commit/73c5cd57f3e172fc36e609c8f5b82c35bc98b695))
+- Update checks (check_for_updates) are now independent of notifications.use_tor. Operators using use_tor = false for a LAN notification endpoint previously had update checks silently skipped; they now run, always through Tor, whenever check_for_updates is enabled. ([8070f185](../../commit/8070f185b4951a58ab2d2a88a64208dbe1567292))
+- Preserve frozen fidelity bond indicators and exact confirmations in the full wallet info view ([8bd572c0](../../commit/8bd572c079aac0d5defd86b613094c271cc64c7b))
+- Fidelity bonds can be frozen/unfrozen in the freeze manager; footer and markers reflect bond state ([b3c36501](../../commit/b3c3650164fd3690dc591d60b3b9f325593403dc))
+- CLI sweeps fall back to expired, unfrozen fidelity bonds when no regular coins are spendable ([d0b02fba](../../commit/d0b02fbaf12e415eb7163a1c26078e40588dd0a8))
+- Use the actual home directory in the standalone TUI on macOS and custom-home Linux installations. ([8bec3740](../../commit/8bec37406c22f3c4b3364c13bda632c0a91bebf3))
+- Keep selected UTXOs visible above the freeze-manager footer ([de5c2e10](../../commit/de5c2e10c4616a913ee4c2bf21eac36a8ca81abe))
+- Fidelity bonds (expired or not) can no longer be selected as CoinJoin inputs with --select-utxos; the taker now rejects them before contacting makers instead of failing at signing time ([d31f2e8a](../../commit/d31f2e8af79c9540dc155fac305b4e4ff61eeba8))
+- Fidelity bond UTXOs are never chosen as the PoDLE commitment UTXO ([dc5deada](../../commit/dc5deada24d1471cb0ec13ad5b7b8be2f574ced3))
+- Stop repeating the fidelity bond proof mode in maker debug logs ([35f67899](../../commit/35f67899e6f70117e3a558e4d7e683682092364f))
+- Close direct connections that send traffic without a handshake and reduce the related log noise ([a9d5aa21](../../commit/a9d5aa215eb2908d45950c9b1e7d9b64deff7906))
+- Clarify which CoinJoin attempts count in maker summaries ([f05430d0](../../commit/f05430d065c62410a890abe70e7752acc80b718a))
+- Close direct connections that keep flooding after the rate limit and stop logging each dropped line ([b4dced34](../../commit/b4dced3402ac2e8b648d769e7e7f2618231d642b))
+- Replace per-message directory relay logging with a periodic traffic summary ([4f864868](../../commit/4f864868eaf985c0b58b7fbb09401a66dc0b06b3))
+- Reconnect to directories in parallel and keep in-flight directory handshakes at startup ([c8f07386](../../commit/c8f07386c0369bc614b3a61d3136b3ac6099090f))
+- Clarify that the Tor PoW defense is only effective on Tor builds with the pow module ([a8e0df5d](../../commit/a8e0df5d665f9f9a4485850a09875fcf0dce78f9))
+- Unify spend/frozn vocabulary for fidelity bonds in the ([bed9d990](../../commit/bed9d990af1098c8e04ca118996811701d8dc94f))
+- Redesign the wallet balance footer as a sums-first ([bed9d990](../../commit/bed9d990af1098c8e04ca118996811701d8dc94f))
+- Correct bond spendability timing in wallet info and clarify bond-only sweeps ([0039b751](../../commit/0039b75130c38ad19df472188ba5c621e4456d15))
+- Announce offers to reconnected directories as soon as each handshake completes, and run the first reconnect pass sooner after startup ([2d1a3d87](../../commit/2d1a3d87fcaa29b4956ba11a6288295a78bc0d3f))
+
+### Configuration Changes
+
+Existing `config.toml` files are not updated automatically. Review the bundled template changes below and apply the relevant options manually.
+
+````diff
+--- config.toml.template (0.41.0)
++++ config.toml.template (0.42.0)
+@@ -256,6 +256,13 @@ [wallet]
+ # Increase only if you have a deliberate need to pay fees above 1000 sat/vB.
+ # max_fee_rate_sat_vb = 1000
+
++# Show the fidelity bond branch in the extended wallet info views
++# (`jm-wallet info --extended`). Fidelity bonds are managed separately via
++# `jm-wallet bonds`; set to false to keep the day-to-day view free of bond
++# addresses. When hidden, a one-line notice still points out funded bonds
++# (active/expired count and total sats) so they do not vanish silently.
++# info_show_fidelity_bonds = true
++
+ # Mnemonic file settings (optional defaults)
+ # mnemonic_file = ""            # Path to mnemonic file
+ # Enable BIP39 onboarding and prompting for unregistered wallets. Default: false.
+@@ -330,6 +337,8 @@ [notifications]
+ # Set to false to keep the ID in local logs only.
+ # include_coinjoin_id = true
+ # include_nick = true
++# Route notification delivery through Tor. Set to false for a notification server
++# on your LAN. Update checks (below) always use Tor regardless of this setting.
+ # use_tor = true
+
+ # Verify TLS certificates of notification servers. Set to false when your
+@@ -356,15 +365,17 @@ [notifications]
+ # notify_startup = true
+
+ # Periodic summary notifications (enabled by default)
++# Maker summaries count attempts where inputs and output addresses were disclosed.
++# Requests rejected before disclosure are excluded, not counted as missed opportunities.
+ # notify_summary = true  # Send periodic CoinJoin stats summary (set to false to disable)
+ # notify_summary_balance = false  # Include total balance and UTXO count in summary (privacy risk)
+ # summary_interval_hours = 24  # Interval: 24 (daily), 168 (weekly), or custom (1-168)
+
+ # Update checks (opt-in, disabled by default)
+ # PRIVACY WARNING: When enabled, this contacts github.com each summary interval
+-# to check for new releases. The request is always routed through Tor and is skipped
+-# when use_tor = false or the Tor proxy is unavailable. GitHub will still see the
+-# Tor exit node IP.
++# to check for new releases. The request is always routed through Tor, even when
++# use_tor = false (which only affects notification delivery), and is skipped when
++# the Tor proxy is unavailable. GitHub will still see the Tor exit node IP.
+ # check_for_updates = false
+
+ # Retry failed notifications in the background (recommended for Tor)
+@@ -508,7 +519,15 @@ [maker]
+ # message_rate_limit = 10   # Messages per second per peer (sustained)
+ # message_burst_limit = 100 # Max burst messages per peer
+
+-# Orderbook rate limiting (protects against orderbook spam attacks)
++# Maker-wide response budgets, independent for directory and direct requests.
++# Positive burst capacities (requests) and finite, positive refill rates (requests/second).
++# Higher values permit more signing/network load under spam. Restart the maker to apply.
++# directory_orderbook_response_burst = 200
++# directory_orderbook_response_refill_per_second = 20.0
++# direct_orderbook_response_burst = 20
++# direct_orderbook_response_refill_per_second = 2.0
++
++# Per-peer orderbook rate limiting (protects against orderbook spam attacks)
+ # orderbook_rate_limit = 1                  # Max responses per peer per interval
+ # orderbook_rate_interval = 10.0            # Interval in seconds
+ # orderbook_violation_warning_threshold = 10 # Start exponential backoff after N violations
+````
+
 ## [0.41.0] - 2026-10-12
 
 Updated maker coin selection algorithms (no more UTXO bloat), BIP39 passphrase support in the TUI and jmwalletd, a new --version option for all commands, and several bug fixes and security hardening improvements.
@@ -4416,7 +4519,8 @@ This release did not change the bundled `config.toml.template`.
 - Pre-built image support for directory server compose.
 - Tor configuration instructions.
 
-[Unreleased]: ../../compare/0.41.0...HEAD
+[Unreleased]: ../../compare/0.42.0...HEAD
+[0.42.0]: ../../compare/0.41.0...0.42.0
 [0.41.0]: ../../compare/0.40.0...0.41.0
 [0.40.0]: ../../compare/0.39.2...0.40.0
 [0.39.2]: ../../compare/0.39.1...0.39.2
