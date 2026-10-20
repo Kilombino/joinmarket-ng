@@ -586,6 +586,7 @@ class TestBuildTakerConfig:
         assert config.fee_rate is None
         assert config.fee_block_target == 10  # From taker.fee_block_target, not wallet default
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_add_peers_in_backend_config(
         self, sample_mnemonic: str, mock_settings: MagicMock
     ) -> None:
@@ -606,6 +607,7 @@ class TestBuildTakerConfig:
         assert config.backend_type == "neutrino"
         assert config.backend_config.get("add_peers") == ["peer1.example.com:38333"]
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_empty_add_peers_by_default(
         self, sample_mnemonic: str, mock_settings: MagicMock
     ) -> None:
@@ -673,6 +675,7 @@ class TestBuildTakerConfig:
 
         assert config.wallet_with_passphrase is True
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_fee_source_in_backend_config(
         self, sample_mnemonic: str, mock_settings: MagicMock
     ) -> None:
@@ -697,6 +700,7 @@ class TestBuildTakerConfig:
         assert config.backend_config.get("fee_estimate_url") == "https://example.com/fee-estimates"
         assert config.backend_config.get("fee_estimate_proxy") == "socks5h://127.0.0.1:9050"
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_fee_source_kwargs_reach_backend(
         self, sample_mnemonic: str, mock_settings: MagicMock
     ) -> None:
@@ -727,6 +731,7 @@ class TestBuildTakerConfig:
         assert kwargs["fee_estimate_url"] is None
         assert kwargs["fee_estimate_proxy"] == "socks5h://127.0.0.1:9050"
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_tls_and_auth_in_backend_config(
         self, sample_mnemonic: str, mock_settings: MagicMock
     ) -> None:
@@ -748,6 +753,7 @@ class TestBuildTakerConfig:
         assert config.backend_config.get("tls_cert_path") == "/tmp/neutrino/tls.cert"
         assert config.backend_config.get("auth_token") == "token-123"
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_defaults_resolve_and_upgrade_https(
         self, sample_mnemonic: str, tmp_path, monkeypatch
     ) -> None:
@@ -834,6 +840,7 @@ class TestBuildTakerConfig:
         )
         assert result is mock_backend
 
+    @pytest.mark.skip(reason="XBT build: neutrino backend is not supported")
     def test_neutrino_include_mempool_flows_to_backend(
         self, sample_mnemonic: str, tmp_path, monkeypatch
     ) -> None:
