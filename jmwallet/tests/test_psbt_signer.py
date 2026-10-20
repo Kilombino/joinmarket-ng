@@ -49,6 +49,7 @@ from jmwallet.wallet.psbt import (
     PSBTKeyValue,
     parse_psbt,
 )
+from jmwallet.wallet.psbt_signer import _psbt_spent_outputs
 from jmwallet.wallet.service import WalletService
 from jmwallet.wallet.signing import (
     TransactionSigningError,
@@ -106,7 +107,7 @@ def _regular_input_records(
     value: int,
     *,
     include_origin: bool = True,
-    sighash_type: int = 1,
+    sighash_type: int = 0x21,  # XBT build: unified sighash
 ) -> tuple[list[tuple[bytes, bytes]], bytes, bytes]:
     address = wallet_service.get_address(mixdepth, change, index)
     key = wallet_service.get_key_for_address(address)
@@ -160,6 +161,7 @@ def test_signs_regular_input_from_verified_key_origin(wallet_service) -> None:
         100_000,
         signature,
         pubkey,
+        _psbt_spent_outputs(signed),
     )
 
 
@@ -179,6 +181,7 @@ def test_signs_jmcore_psbt_preserving_input_records(
                 witness_utxo_value=100_000,
                 witness_utxo_script=script_pubkey,
                 witness_script=b"",
+                sighash_type=0x21,  # XBT build: unified sighash
                 bip32_derivations=[
                     BIP32Derivation(
                         pubkey=pubkey,
@@ -211,6 +214,7 @@ def test_signs_jmcore_psbt_preserving_input_records(
         100_000,
         signature_record.value,
         pubkey,
+        _psbt_spent_outputs(signed),
     )
 
 
@@ -260,7 +264,7 @@ def test_signs_canonical_fidelity_bond_without_key_origin(wallet_service) -> Non
     records = [
         (bytes([PSBT_IN_WITNESS_UTXO]), _witness_utxo(200_000, script_pubkey)),
         (bytes([PSBT_IN_WITNESS_SCRIPT]), witness_script),
-        (bytes([PSBT_IN_SIGHASH_TYPE]), (1).to_bytes(4, "little")),
+        (bytes([PSBT_IN_SIGHASH_TYPE]), (0x21).to_bytes(4, "little")),
     ]
     raw = _build_psbt(
         [TxInput.from_hex("ee" * 32, 0, sequence=0xFFFFFFFE)],
@@ -279,7 +283,15 @@ def test_signs_canonical_fidelity_bond_without_key_origin(wallet_service) -> Non
     )
 
     assert plan.inputs[0].wallet_input_type == "fidelity-bond"
-    assert verify_p2wsh_signature(signed.transaction, 0, witness_script, 200_000, signature, pubkey)
+    assert verify_p2wsh_signature(
+        signed.transaction,
+        0,
+        witness_script,
+        200_000,
+        signature,
+        pubkey,
+        _psbt_spent_outputs(signed),
+    )
 
 
 def test_valid_existing_wallet_signature_is_preserved(wallet_service) -> None:
@@ -337,7 +349,7 @@ def test_rejects_unsupported_sighash_for_owned_input(wallet_service) -> None:
         [records],
     )
 
-    with pytest.raises(PSBTError, match="only SIGHASH_ALL"):
+    with pytest.raises(PSBTError, match="unified sighash"):
         wallet_service.prepare_psbt_signing(raw, 0)
 
 
@@ -578,6 +590,7 @@ def test_signs_owned_input_beside_foreign_multisig_p2wsh(wallet_service, psbt_ve
         60_000,
         signature_record.value,
         pubkey,
+        _psbt_spent_outputs(parse_psbt(v0_raw)),
     )
 
 
@@ -691,7 +704,13 @@ def test_v2_bond_signs_using_required_time_locktime(wallet_service) -> None:
     signature = signed.input_maps[0].records[-1].value
     assert signed.input_maps[0].records[-1].key == bytes([PSBT_IN_PARTIAL_SIG]) + pubkey
     assert verify_p2wsh_signature(
-        original.transaction, 0, witness_script, 200_000, signature, pubkey
+        original.transaction,
+        0,
+        witness_script,
+        200_000,
+        signature,
+        pubkey,
+        _psbt_spent_outputs(original),
     )
 
 
