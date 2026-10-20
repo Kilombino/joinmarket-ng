@@ -99,6 +99,8 @@ modules:
     buildsystem: cmake-ninja
     run-tests: true
     config-opts:
+      # Flatpak's loader searches /app/lib, not CMake's default /app/lib64.
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DSECP256K1_ENABLE_MODULE_RECOVERY=ON
       - -DSECP256K1_ENABLE_MODULE_ECDH=ON
       - -DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON

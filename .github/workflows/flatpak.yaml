@@ -1,6 +1,11 @@
 name: Flatpak
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'flatpak/**'
+      - '.github/workflows/flatpak.yaml'
   pull_request:
     paths:
       - 'flatpak/**'
