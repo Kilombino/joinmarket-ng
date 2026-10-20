@@ -552,6 +552,11 @@ jobs:
           docker pull $TAKER_IMAGE
           docker pull $JMWALLETD_IMAGE
 
+      - name: Smoke-test maker image wallet tools
+        run: >-
+          pytest -c pytest.ini tests/test_maker_image.py
+          -m docker --no-cov --fail-on-skip
+
       - name: "Start e2e services"
         env:
           DOCKER_BUILDKIT: 1

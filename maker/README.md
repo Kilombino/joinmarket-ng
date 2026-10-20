@@ -15,6 +15,21 @@ Earn fees by providing liquidity for CoinJoin transactions. Makers passively ear
 
 For full documentation, see [maker Documentation](https://joinmarket-ng.github.io/joinmarket-ng/README-maker/).
 
+## Docker Wallet Tools
+
+The maker image includes `jm-maker`, `jm-taker`, `jm-wallet`, and `jm-tumbler`.
+Its default command remains `jm-maker --help`; override the command to use another
+tool, for example:
+
+```bash
+docker compose run --rm maker jm-taker --help
+```
+
+Stop the maker before running another spender against the same wallet, and select
+the intended wallet explicitly with `--mnemonic-file`. Bundled tools still require
+their normal backend and Tor configuration, including Tor control for tumbler
+maker sessions. See [tumbler setup and safety](../docs/README-tumbler.md).
+
 ## Maker UTXO Selection
 
 Set `[maker] merge_algorithm` in `config.toml`, or pass `--merge-algorithm`:

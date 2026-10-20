@@ -53,17 +53,19 @@ RUN echo "setuptools==${SETUPTOOLS_VERSION}" > /build/constraints.txt && \
 
 # Install jmcore dependencies (with hash verification)
 # All requirements are installed in a single pip invocation so that pip resolves the
-# dependency graph once instead of re-resolving across three sequential calls.
+# dependency graph once instead of re-resolving across four sequential calls.
 COPY jmcore/requirements.txt /build/jmcore/requirements.txt
 COPY jmwallet/requirements.txt /build/jmwallet/requirements.txt
 COPY maker/requirements.txt /build/maker/requirements.txt
+COPY taker/requirements.txt /build/taker/requirements.txt
 
 RUN --mount=type=cache,target=/root/.cache/pip,id=jmng-pip-${SETUPTOOLS_VERSION} \
     if [ -n "$SOURCE_DATE_EPOCH" ]; then export SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH; fi && \
     pip install --prefix=/app \
         -r /build/jmcore/requirements.txt \
         -r /build/jmwallet/requirements.txt \
-        -r /build/maker/requirements.txt
+        -r /build/maker/requirements.txt \
+        -r /build/taker/requirements.txt
 
 # Copy all source packages and install in a single pip invocation so that pip resolves
 # dependencies once. --build-constraint pins setuptools version in PEP 517 build isolation
@@ -75,13 +77,21 @@ COPY jmwallet/src /build/jmwallet/src
 COPY jmwallet/pyproject.toml /build/jmwallet/
 COPY maker/src /build/maker/src
 COPY maker/pyproject.toml /build/maker/
+# Bundle the wallet-operation tools without starting additional services.
+# Tumbler's external dependencies are already supplied by the packages above.
+COPY taker/src /build/taker/src
+COPY taker/pyproject.toml /build/taker/
+COPY tumbler/src /build/tumbler/src
+COPY tumbler/pyproject.toml /build/tumbler/
 
 RUN --mount=type=cache,target=/root/.cache/pip,id=jmng-pip-${SETUPTOOLS_VERSION} \
     if [ -n "$SOURCE_DATE_EPOCH" ]; then export SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH; fi && \
     pip install --no-deps --prefix=/app --build-constraint /build/constraints.txt \
         /build/jmcore \
         /build/jmwallet \
-        /build/maker
+        /build/maker \
+        /build/taker \
+        /build/tumbler
 
 # Static bash completions shipped in the runtime image. Staged here so the
 # timestamp normalization below covers them and the production COPY layer stays
